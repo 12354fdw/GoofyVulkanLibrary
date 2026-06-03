@@ -1,0 +1,27 @@
+cmake_minimum_required(VERSION 3.25)
+
+project(GraphicsLib LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+find_package(SDL3 CONFIG REQUIRED)
+find_package(Vulkan REQUIRED)
+
+get_target_property(
+    SDL_INCLUDES
+    SDL3::SDL3
+    INTERFACE_INCLUDE_DIRECTORIES
+)
+
+message(STATUS "SDL includes = ${SDL_INCLUDES}")
+add_executable(main
+    src/main.cpp
+)
+
+target_link_libraries(main PRIVATE
+    SDL3::SDL3
+    Vulkan::Vulkan
+)
+get_target_property(INCS main INCLUDE_DIRECTORIES)
+message(STATUS "main includes=${INCS}")
