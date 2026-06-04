@@ -1,5 +1,6 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
+#include <cstdint>
 #include <iostream>
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -57,9 +58,14 @@ const char *VkResultToString(VkResult result) {
     return "UNKNOWN_VK_RESULT";
   }
 }
-
 void PrintVkResult(VkResult result) {
   std::cout << VkResultToString(result) << " (" << static_cast<int>(result) << ")\n";
+}
+VkResult CheckVkResult(VkResult result) {
+  if (result != VK_SUCCESS) std::cout << "[GFVL] Error! : " << VkResultToString(result) << " (" << static_cast<int>(result) << ")\n";
+  if (GFVL_DEBUG_MODE) std::cout << "[GFVL] Debug : " << VkResultToString(result) << " (" << static_cast<int>(result) << ")\n";
+
+  return result;
 }
 
 int main() {
@@ -74,7 +80,7 @@ int main() {
     .applicationVersion = 1, // version of application
     .pEngineName = "goofyVLib", // engine name
     .engineVersion = 1, // engine version
-    .apiVersion = VK_API_VERSION_1_4 // version of vulkan
+    .apiVersion = VK_API_VERSION_1_3 // version of vulkan
   };
 
   // detect instance extensions
@@ -102,8 +108,125 @@ int main() {
     .ppEnabledExtensionNames = instanceExtensions
   };
 
-  SDL_Delay(3000);
+  VkInstance instance; // literally vulkan itself
+  CheckVkResult(vkCreateInstance( // create instance
+    &instanceCreationInfo, 
+    NULL, // pipe to a VkAllocationCallbacks thingamabob
+    &instance
+  ));
 
+  VkSurfaceKHR surface;
+
+  if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
+    std::cout << SDL_GetError() << '\n';
+    return 1;
+  }
+  uint32_t availablePhysicalDevicesCount = 0;
+
+  // First call: get count
+  CheckVkResult(
+      vkEnumeratePhysicalDevices(instance, &availablePhysicalDevicesCount, nullptr));
+
+  std::cout << "[GFVL] Physical device count: " << availablePhysicalDevicesCount
+            << "\n";
+
+  if (availablePhysicalDevicesCount == 0) {
+    std::cout << "[GFVL] No Vulkan-compatible GPUs found.\n";
+    return 1;
+  }
+
+  // Allocate storage
+  std::vector<VkPhysicalDevice> availablePhysicalDevices(availablePhysicalDevicesCount);
+
+  // Second call: get devices
+  CheckVkResult(vkEnumeratePhysicalDevices(instance, &availablePhysicalDevicesCount, availablePhysicalDevices.data()));
+
+  if (GFVL_DEBUG_MODE) {
+    std::cout << "[GFVL] Detected devices:\n";
+
+    for (uint32_t i = 0; i < availablePhysicalDevicesCount; i++) {
+      VkPhysicalDeviceProperties props{};
+      vkGetPhysicalDeviceProperties(availablePhysicalDevices[i], &props);
+
+      std::cout << "  Device " << i << '\n';
+      std::cout << "    Name: " << props.deviceName << '\n';
+      std::cout << "    API Version: " << VK_VERSION_MAJOR(props.apiVersion) << '.' << VK_VERSION_MINOR(props.apiVersion) << '.' << VK_VERSION_PATCH(props.apiVersion) << '\n';
+      std::cout << "    Driver Version: " << props.driverVersion << '\n';
+      std::cout << "    Vendor ID: " << props.vendorID << '\n';
+      std::cout << "    Device ID: " << props.deviceID << '\n';
+
+      switch (props.deviceType) {
+      case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+        std::cout << "    Type: Discrete GPU\n";
+        break;
+
+      case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+        std::cout << "    Type: Integrated GPU\n";
+        break;
+
+      case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+        std::cout << "    Type: Virtual GPU\n";
+        break;
+
+      case VK_PHYSICAL_DEVICE_TYPE_CPU:
+        std::cout << "    Type: CPU\n";
+        break;
+
+      default:
+        std::cout << "    Type: Other\n";
+        break;
+      }
+
+      std::cout << '\n';
+    }
+  }
+
+  uint32_t selectedPhysicalDeviceIndex = 0;
+  std::cout << "Pick a device." << "\n";
+  std::cin >> selectedPhysicalDeviceIndex;
+
+  VkPhysicalDevice selectedPhysicalDevice = availablePhysicalDevices[selectedPhysicalDeviceIndex];
+
+      VkDevice logicalDevice;
+  VkDeviceCreateInfo logicalDeviceCreationInfo = {
+    .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+    .pNext = NULL,
+    .flags = VkDeviceCreateFlags {},
+    .queueCreateInfoCount = NULL,
+    .pQueueCreateInfos = NULL,
+    .enabledLayerCount = NULL,
+    .ppEnabledLayerNames = NULL,
+    .enabledExtensionCount = NULL,
+    .ppEnabledExtensionNames = NULL,
+    .pEnabledFeatures = NULL
+  };
+  vkCreateDevice(selectedPhysicalDevice, &logicalDeviceCreationInfo, NULL, &logicalDevice);
+
+  uint32_t queueFamilyCount = 0;
+
+  vkGetPhysicalDeviceQueueFamilyProperties(selectedPhysicalDevice, &queueFamilyCount, nullptr);
+
+  std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+
+  vkGetPhysicalDeviceQueueFamilyProperties(selectedPhysicalDevice, &queueFamilyCount, queueFamilies.data());
+
+  for (uint32_t i = 0; i < queueFamilyCount; i++) {
+    std::cout << "Queue Family " << i << '\n';
+
+    if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+      std::cout << " Graphics\n";
+
+    if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT)
+      std::cout << " Compute\n";
+
+    if (queueFamilies[i].queueFlags & VK_QUEUE_TRANSFER_BIT)
+      std::cout << " Transfer\n";
+  }
+
+  SDL_Delay(3000);
+  vkDestroyDevice(logicalDevice, nullptr);
+  vkDestroySurfaceKHR(instance, surface, nullptr);
+  vkDestroyInstance(instance, nullptr);
   SDL_DestroyWindow(window);
   SDL_Quit();
 
