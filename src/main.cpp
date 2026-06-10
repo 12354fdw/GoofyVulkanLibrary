@@ -2,6 +2,7 @@
 #include <SDL3/SDL_vulkan.h>
 #include <cstdint>
 #include <iostream>
+#include <stdexcept>
 #include <vector>
 #include <vulkan/vulkan.h>
 
@@ -10,10 +11,9 @@
 
 const bool GFVL_DEBUG_MODE = true;
 enum GFVL_PREFERRED_GPU {
-  GFVL_PREFERRED_GPU_INTEGRATED_GRAPHICS,
-  GFVL_PREFERRED_GPU_DEDICATED_GRAPHICS,
+  GFVL_PREFERRED_GPU_POWER_SAVING,
+  GFVL_PREFERRED_GPU_PERFORMANCE,
 };
-
 void error() {
   std::cout << "Error, Exiting program..." <<  "\n";
 }
@@ -112,7 +112,7 @@ std::vector<VkPhysicalDevice> GFVL_EnumeratePhysicalDevices(VkInstance instance)
   CheckVkResult(vkEnumeratePhysicalDevices(instance, &availablePhysicalDevicesCount, nullptr));
   std::cout << "[GFVL] Found " << availablePhysicalDevicesCount << " supported devices. \n";
 
-  if (availablePhysicalDevicesCount == 0) std::cout << "[GFVL] No Vulkan-compatible GPUs found.\n";
+  if (availablePhysicalDevicesCount == 0) throw std::runtime_error("[GFVL] No Vulkan-compatible GPUs found.\n");
 
   std::vector<VkPhysicalDevice> availablePhysicalDevices(availablePhysicalDevicesCount);
   CheckVkResult(vkEnumeratePhysicalDevices(instance, &availablePhysicalDevicesCount, availablePhysicalDevices.data()));
@@ -156,10 +156,12 @@ std::vector<VkPhysicalDevice> GFVL_EnumeratePhysicalDevices(VkInstance instance)
       std::cout << '\n';
     }
   }
+  return availablePhysicalDevices;
 }
 std::vector<VkQueueFamilyProperties> GFVL_EnumerateDeviceQueueFamilyProperties(VkPhysicalDevice device) {
   uint32_t queueFamilyCount = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+  if (queueFamilyCount == 0) throw std::runtime_error("[GFVL] No Vulkan queue families found.");
   std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
   vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
   if (GFVL_DEBUG_MODE) {
@@ -171,6 +173,88 @@ std::vector<VkQueueFamilyProperties> GFVL_EnumerateDeviceQueueFamilyProperties(V
     }
   }
   return queueFamilies;
+}
+VkDeviceQueueCreateInfo GFVL_InitializeQueueCreation(std::vector<VkQueueFamilyProperties> queueFamilies, VkSurfaceKHR surface, VkPhysicalDevice device) {
+  uint32_t graphicsQueueFamily = UINT32_MAX;
+  if (GFVL_DEBUG_MODE) std::cout << "[GFVL] Searching for graphics + present queue family...\n";
+  for (uint32_t i = 0; i < queueFamilies.size(); i++) {
+    VkBool32 presentSupport = VK_FALSE;
+    CheckVkResult(
+        vkGetPhysicalDeviceSurfaceSupportKHR(
+            device,
+            i,
+            surface,
+            &presentSupport
+        )
+    );
+
+    bool graphicsSupport = (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
+
+    if (GFVL_DEBUG_MODE) {
+      std::cout << "[GFVL] Queue Family " << i << '\n';
+      std::cout << "  Queue Count: " << queueFamilies[i].queueCount << '\n';
+      std::cout << "  Graphics Support: " << (graphicsSupport ? "Yes" : "No") << '\n';
+      std::cout << "  Present Support: " << (presentSupport ? "Yes" : "No") << '\n';
+    }
+
+    if (graphicsSupport && presentSupport) {
+      graphicsQueueFamily = i;
+
+      if (GFVL_DEBUG_MODE) std::cout << "[GFVL] Selected queue family " << graphicsQueueFamily << '\n';
+
+      break;
+    }
+  }
+
+  if (graphicsQueueFamily == UINT32_MAX) throw std::runtime_error("[GFVL] No queue family supports both graphics and presentation.");
+
+  static float queuePriority = 1.0f;
+
+  VkDeviceQueueCreateInfo queueCreateInfo{
+      .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .queueFamilyIndex = graphicsQueueFamily,
+      .queueCount = 1,
+      .pQueuePriorities = &queuePriority
+  };
+
+  if (GFVL_DEBUG_MODE) {
+    std::cout << "[GFVL] Queue creation info initialized.\n";
+    std::cout << "[GFVL] Family Index: " << queueCreateInfo.queueFamilyIndex << '\n';
+  }
+
+  return queueCreateInfo;
+}
+std::vector<const char *> GFVL_EnumerateDeviceExtensions(VkPhysicalDevice device) {
+  uint32_t deviceExtensionCount = 0;
+
+  CheckVkResult(vkEnumerateDeviceExtensionProperties(device, nullptr, &deviceExtensionCount, nullptr));
+
+  std::vector<VkExtensionProperties> deviceExtensions(deviceExtensionCount);
+
+  CheckVkResult(vkEnumerateDeviceExtensionProperties(device, nullptr, &deviceExtensionCount, deviceExtensions.data()));
+
+  if (GFVL_DEBUG_MODE) {
+    std::cout << "[GFVL] Available device extensions:\n";
+
+    for (const auto &ext : deviceExtensions) std::cout << "  " << ext.extensionName << '\n';
+  }
+
+  std::vector<const char *> enabledDeviceExtensions;
+
+  for (const auto &ext : deviceExtensions) {
+    if (strcmp(ext.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0) {
+      enabledDeviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
+      if (GFVL_DEBUG_MODE) std::cout << "[GFVL] Enabling extension: " << VK_KHR_SWAPCHAIN_EXTENSION_NAME << '\n';
+    }
+  }
+
+  if (enabledDeviceExtensions.empty()) throw std::runtime_error("[GFVL] Required extension VK_KHR_swapchain not found.");
+  if (GFVL_DEBUG_MODE) std::cout << "[GFVL] Enabled device extension count: " << enabledDeviceExtensions.size() << '\n';
+
+  return enabledDeviceExtensions;
 }
 int main() {
   SDL_Init(SDL_INIT_VIDEO); // initialize video drivers
@@ -193,70 +277,19 @@ int main() {
   
   uint32_t selectedPhysicalDeviceIndex = 0;
   VkPhysicalDevice selectedPhysicalDevice = availablePhysicalDevices[selectedPhysicalDeviceIndex];
+
   std::vector<VkQueueFamilyProperties> queueFamilies = GFVL_EnumerateDeviceQueueFamilyProperties(selectedPhysicalDevice);
+  VkDeviceQueueCreateInfo queueCreationInfo = GFVL_InitializeQueueCreation(queueFamilies, surface, selectedPhysicalDevice);
 
-  uint32_t graphicsQueueFamily = UINT32_MAX;
-
-  for (uint32_t i = 0; i < queueFamilies.size() ; i++) {
-    VkBool32 presentSupport = VK_FALSE;
-
-    vkGetPhysicalDeviceSurfaceSupportKHR(selectedPhysicalDevice, i, surface, &presentSupport);
-
-    bool graphicsSupport = queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT;
-
-    if (graphicsSupport && presentSupport) {
-      graphicsQueueFamily = i;
-      break;
-    }
-  }
-  if (graphicsQueueFamily == UINT32_MAX) {
-    std::cout << "[GFVL] No graphics queue found\n";
-    return 1;
-  }
-  float queuePriority = 1.0f;
-
-  VkDeviceQueueCreateInfo queueCreateInfo{
-    .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-    .queueFamilyIndex = graphicsQueueFamily,
-    .queueCount = 1,
-    .pQueuePriorities = &queuePriority,
-  };
-
-  uint32_t deviceExtensionCount = 0;
-
-  vkEnumerateDeviceExtensionProperties(selectedPhysicalDevice, nullptr, &deviceExtensionCount, nullptr);
-
-  std::vector<VkExtensionProperties> deviceExtensions(deviceExtensionCount);
-
-  vkEnumerateDeviceExtensionProperties(selectedPhysicalDevice, nullptr, &deviceExtensionCount, deviceExtensions.data());
-
-  if (GFVL_DEBUG_MODE) {
-    std::cout << "[GFVL] Available device extensions:\n";
-
-    for (const auto &ext : deviceExtensions) {
-      std::cout << "  " << ext.extensionName << '\n';
-    }
-  }
-
-  std::vector<const char *> enabledDeviceExtensionsGoon;
-
-  for (const auto &ext : deviceExtensions) {
-    if (strcmp(ext.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0) {
-      enabledDeviceExtensionsGoon.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    }
-  }
-
-  uint32_t enabledDeviceExtensionCount = static_cast<uint32_t>(enabledDeviceExtensionsGoon.size());
-
-  const char *const *enabledDeviceExtensions = enabledDeviceExtensionsGoon.data();
+  std::vector<const char *> deviceExtensions = GFVL_EnumerateDeviceExtensions(selectedPhysicalDevice);
 
   VkDeviceCreateInfo logicalDeviceCreationInfo{
-      .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .pNext = NULL,
-      .queueCreateInfoCount = 1,
-      .pQueueCreateInfos = &queueCreateInfo,
-      .enabledExtensionCount = enabledDeviceExtensionCount,
-      .ppEnabledExtensionNames = enabledDeviceExtensions,
+    .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+    .pNext = NULL,
+    .queueCreateInfoCount = 1,
+    .pQueueCreateInfos = &queueCreationInfo,
+    .enabledExtensionCount = (uint32_t)deviceExtensions.size(),
+    .ppEnabledExtensionNames = deviceExtensions.data(),
   };
   VkDevice logicalDevice;
   vkCreateDevice(selectedPhysicalDevice, &logicalDeviceCreationInfo, NULL, &logicalDevice);
