@@ -67,9 +67,11 @@ void PrintVkResult(VkResult result) {
   std::cout << VkResultToString(result) << " (" << static_cast<int>(result) << ")\n";
 }
 VkResult CheckVkResult(VkResult result) {
-  if (result != VK_SUCCESS) std::cout << "[GFVL] Error! : " << VkResultToString(result) << " (" << static_cast<int>(result) << ")\n";
+  if (result != VK_SUCCESS) {
+    std::cout << "[GFVL] Error! : " << VkResultToString(result) << " (" << static_cast<int>(result) << ")\n";
+    throw std::runtime_error("[GFVL] Error detected.");
+  }
   if (GFVL_DEBUG_MODE) std::cout << "[GFVL] Debug : " << VkResultToString(result) << " (" << static_cast<int>(result) << ")\n";
-
   return result;
 }
 
@@ -78,6 +80,7 @@ VkInstance GFVL_InitializeVkInstance(VkApplicationInfo* appInfo) {
   const char *const *instanceExtensions = SDL_Vulkan_GetInstanceExtensions(&instanceExtensionCount);
 
   if (GFVL_DEBUG_MODE) { // optionally print the info
+    std::cout << "[GFVL] GFVL_InitializeVkInstance \n";
     if (instanceExtensions == NULL) std::cout << "[GFVL] No instance extensions supported.. What?" << "\n";
     std::cout << "[GFVL] Detected instance extensions :\n";
     for (uint32_t i = 0; i < instanceExtensionCount; i++) std::cout << "  " << instanceExtensions[i] << '\n';
@@ -199,9 +202,7 @@ VkDeviceQueueCreateInfo GFVL_InitializeQueueCreation(std::vector<VkQueueFamilyPr
 
     if (graphicsSupport && presentSupport) {
       graphicsQueueFamily = i;
-
       if (GFVL_DEBUG_MODE) std::cout << "[GFVL] Selected queue family " << graphicsQueueFamily << '\n';
-
       break;
     }
   }
@@ -228,25 +229,20 @@ VkDeviceQueueCreateInfo GFVL_InitializeQueueCreation(std::vector<VkQueueFamilyPr
 }
 std::vector<const char *> GFVL_EnumerateDeviceExtensions(VkPhysicalDevice device) {
   uint32_t deviceExtensionCount = 0;
-
   CheckVkResult(vkEnumerateDeviceExtensionProperties(device, nullptr, &deviceExtensionCount, nullptr));
-
+  
   std::vector<VkExtensionProperties> deviceExtensions(deviceExtensionCount);
-
   CheckVkResult(vkEnumerateDeviceExtensionProperties(device, nullptr, &deviceExtensionCount, deviceExtensions.data()));
 
   if (GFVL_DEBUG_MODE) {
     std::cout << "[GFVL] Available device extensions:\n";
-
     for (const auto &ext : deviceExtensions) std::cout << "  " << ext.extensionName << '\n';
   }
 
   std::vector<const char *> enabledDeviceExtensions;
-
   for (const auto &ext : deviceExtensions) {
     if (strcmp(ext.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0) {
       enabledDeviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-
       if (GFVL_DEBUG_MODE) std::cout << "[GFVL] Enabling extension: " << VK_KHR_SWAPCHAIN_EXTENSION_NAME << '\n';
     }
   }
@@ -267,7 +263,7 @@ int main() {
     .pApplicationName = "goofyVLib Example", // name
     .applicationVersion = 1, // version of application
     .pEngineName = "goofyVLib", // engine name
-    .engineVersion = 1, // engine versions
+    .engineVersion = 1,  // engine versions
     .apiVersion = VK_API_VERSION_1_3 // version of vulkan
   };
 
@@ -292,8 +288,14 @@ int main() {
     .ppEnabledExtensionNames = deviceExtensions.data(),
   };
   VkDevice logicalDevice;
-  vkCreateDevice(selectedPhysicalDevice, &logicalDeviceCreationInfo, NULL, &logicalDevice);
-  
+  CheckVkResult(
+  vkCreateDevice(
+      selectedPhysicalDevice,
+      &logicalDeviceCreationInfo,
+      nullptr,
+      &logicalDevice
+    )
+  );
 
   SDL_Delay(3000);
   vkDestroyDevice(logicalDevice, nullptr);
