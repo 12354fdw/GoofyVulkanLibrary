@@ -1,13 +1,17 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
 #include <vulkan/vulkan.h>
 
+
 // Remove-Item build -Recurse -Force; cmake -B build -DCMAKE_PREFIX_PATH=C:/msys64/ucrt64 -G Ninja
 // cmake --build build --verbose; build/main.exe
+// glslc src/vertex_shader.vert -o src/vertex_shader.spv
+// glslc src/fragment_shader.frag -o src/fragment_shader.spv
 
 const bool GFVL_DEBUG_MODE = true;
 enum GFVL_PREFERRED_GPU {
@@ -53,6 +57,20 @@ struct GFVL_SwapchainConfig {
   VkExtent2D extent;
   uint32_t imageCount;
 };
+std::vector<char> readFile(const std::string &filename) {
+  std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+  if (!file.is_open()) {
+    throw std::runtime_error("failed to open file!");
+  }
+  size_t fileSize = (size_t)file.tellg();
+  std::vector<char> buffer(fileSize);
+  file.seekg(0);
+  file.read(buffer.data(), fileSize);
+  file.close();
+
+  return buffer;
+}
 const char *VkResultToString(VkResult result) {
   switch (result) {
   case VK_SUCCESS:
@@ -101,9 +119,19 @@ void PrintVkResult(VkResult result) {
 VkResult CheckVkResult(VkResult result) {
   if (result < 0) {
     std::cout << "[GFVL] Error! : " << VkResultToString(result) << " (" << static_cast<int>(result) << ")\n";
-    throw std::runtime_error("[GFVL] Error detected.");
+    throw std::runtime_error("[GFVL] Error detected. read the above message");
   }
   return result;
+}
+VkShaderModule createShaderModule(const std::vector<char> &code, VkDevice device) {
+  VkShaderModuleCreateInfo shaderCreationInfo{
+      .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+      .codeSize = code.size(),
+      .pCode = reinterpret_cast<const uint32_t *>(code.data())
+    };
+  VkShaderModule shaderModule;
+  CheckVkResult(vkCreateShaderModule(device, &shaderCreationInfo, nullptr, &shaderModule));
+  return shaderModule;
 }
 VkInstance GFVL_InitializeVkInstance(VkApplicationInfo *appInfo) {
   uint32_t instanceExtensionCount = 0;
@@ -612,7 +640,52 @@ int main() {
   GFVL_BuildSwapchain(swapchain, initialConfig, initialSupport);
   
   // i hate my life
+  VkShaderModule vertexShaderModule = createShaderModule(readFile("src/vertex_shader.spv"), device);
+  VkShaderModule fragmentShaderModule = createShaderModule(readFile("src/fragment_shader.spv"), device);
 
+  VkPipelineShaderStageCreateInfo vertexShaderStageInfo{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_VERTEX_BIT,
+      .module = vertexShaderModule,
+      .pName = "main"
+    };
+
+  VkPipelineShaderStageCreateInfo fragmentShaderStageInfo{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+      .module = fragmentShaderModule,
+      .pName = "main"
+    };
+
+  VkPipelineShaderStageCreateInfo shaderStages[] = {
+    VkPipelineShaderStageCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = VK_SHADER_STAGE_VERTEX_BIT,
+        .module = vertexShaderModule,
+        .pName = "vertexShader",
+    },
+    VkPipelineShaderStageCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .module = fragmentShaderModule,
+        .pName = "fragmentShader",
+    }
+  };
+  std::vector<VkDynamicState> dynamicStates = {
+      VK_DYNAMIC_STATE_VIEWPORT,
+      VK_DYNAMIC_STATE_SCISSOR};
+
+  VkPipelineDynamicStateCreateInfo dynamicState{};
+  dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+  dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+  dynamicState.pDynamicStates = dynamicStates.data();
+
+  VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+  vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+  vertexInputInfo.vertexBindingDescriptionCount = 0;
+  vertexInputInfo.pVertexBindingDescriptions = nullptr; 
+  vertexInputInfo.vertexAttributeDescriptionCount = 0;
+  vertexInputInfo.pVertexAttributeDescriptions = nullptr;
 
   bool running = true;
   bool framebufferResized = false;
@@ -649,6 +722,8 @@ int main() {
   vkDestroyDevice(device, nullptr);
   vkDestroySurfaceKHR(instance, surface, nullptr);
   vkDestroyInstance(instance, nullptr);
+  vkDestroyShaderModule(device, fragmentShaderModule, nullptr);
+  vkDestroyShaderModule(device, vertexShaderModule, nullptr);
 
   SDL_DestroyWindow(window);
   SDL_Quit();
