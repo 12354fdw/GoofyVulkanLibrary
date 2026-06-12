@@ -14,12 +14,14 @@ enum GFVL_PREFERRED_GPU {
   GFVL_PREFERRED_GPU_POWER_SAVING,
   GFVL_PREFERRED_GPU_PERFORMANCE,
 };
+
 struct GFVL_PHYSICAL_DEVICE {
   VkPhysicalDevice device = VK_NULL_HANDLE;
   uint32_t graphicsFamilyIndex = UINT32_MAX;
   uint32_t presentFamilyIndex = UINT32_MAX;
   VkDeviceSize videoMemory = 0;
 };
+
 struct GFVL_Swapchain {
   VkSwapchainKHR swapchain{};
   VkDevice device{};
@@ -168,16 +170,9 @@ bool GFVL_EnumerateQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface, 
   vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
   for (uint32_t i = 0; i < queueFamilyCount; i++) {
-    const bool graphicsSupport =
-        (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
-
+    const bool graphicsSupport = (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
     VkBool32 presentationSupport = VK_FALSE;
-    CheckVkResult(
-        vkGetPhysicalDeviceSurfaceSupportKHR(
-            device,
-            i,
-            surface,
-            &presentationSupport));
+    CheckVkResult(vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentationSupport));
 
     if (graphicsSupport && graphicsFamilyIndex == UINT32_MAX)
       graphicsFamilyIndex = i;
@@ -186,36 +181,25 @@ bool GFVL_EnumerateQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface, 
       presentFamilyIndex = i;
 
     /*if (GFVL_DEBUG_MODE) {
-      std::cout << "[GFVL] Queue Family " << i << '\n';
+      std::cout << "[GFVL] Queue Family " << i << '\n'; 
       std::cout << "  Graphics: " << (graphicsSupport ? "Yes" : "No") << '\n';
       std::cout << "  Present: " << (presentationSupport ? "Yes" : "No") << '\n';
       std::cout << "  Queue Count: " << queueFamilies[i].queueCount << '\n';
     }*/
   }
 
-  return graphicsFamilyIndex != UINT32_MAX &&
-         presentFamilyIndex != UINT32_MAX;
+  return graphicsFamilyIndex != UINT32_MAX && presentFamilyIndex != UINT32_MAX;
 }
 bool GFVL_HasRequiredDeviceExtensions(VkPhysicalDevice device) {
   uint32_t extensionCount = 0;
 
-  CheckVkResult(
-      vkEnumerateDeviceExtensionProperties(
-          device,
-          nullptr,
-          &extensionCount,
-          nullptr));
+  CheckVkResult(vkEnumerateDeviceExtensionProperties( device, nullptr, &extensionCount, nullptr));
 
   std::vector<VkExtensionProperties> extensions(extensionCount);
 
-  CheckVkResult(
-      vkEnumerateDeviceExtensionProperties(
-          device,
-          nullptr,
-          &extensionCount,
-          extensions.data()));
+  CheckVkResult(vkEnumerateDeviceExtensionProperties( device, nullptr, &extensionCount,extensions.data()));
 
-  for (const auto &extension : extensions) {
+  for (const VkExtensionProperties &extension : extensions) {
     if (strcmp(extension.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0)
       return true;
   }
@@ -418,7 +402,7 @@ VkDeviceQueueCreateInfo GFVL_InitializeQueueCreation(uint32_t graphicsFamilyInde
 
   return queueCreateInfo;
 }
-std::vector<const char *> GFVL_EnumerateDeviceExtensions(VkPhysicalDevice device) {
+std::vector<const char *> GFVL_EnumerateDeviceExtensions(VkPhysicalDevice device) { 
   uint32_t deviceExtensionCount = 0;
   CheckVkResult(vkEnumerateDeviceExtensionProperties(device, nullptr, &deviceExtensionCount, nullptr));
 
@@ -432,7 +416,7 @@ std::vector<const char *> GFVL_EnumerateDeviceExtensions(VkPhysicalDevice device
   }
   */
   std::vector<const char *> enabledDeviceExtensions;
-  for (const auto &ext : deviceExtensions) {
+  for (const VkExtensionProperties &ext : deviceExtensions) {
     if (strcmp(ext.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0) {
       enabledDeviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
       if (GFVL_DEBUG_MODE)
@@ -447,30 +431,41 @@ std::vector<const char *> GFVL_EnumerateDeviceExtensions(VkPhysicalDevice device
 
   return enabledDeviceExtensions;
 }
-GFVL_SwapchainConfig GFVL_SelectSwapchainConfig(const GFVL_SwapchainSupport &swapchainSupport, SDL_Window *window, bool vsync) {
-  GFVL_SwapchainConfig swapchainConfiguration{};
 
+GFVL_SwapchainSupport GFVL_QuerySwapchainSupport(VkPhysicalDevice device, VkSurfaceKHR surface) {
+  GFVL_SwapchainSupport swapchainSupport{};
+
+  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &swapchainSupport.capabilities);
+
+  uint32_t count = 0;
+
+  vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, nullptr);
+  swapchainSupport.formats.resize(count);
+  vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, swapchainSupport.formats.data());
+
+  vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &count, nullptr);
+  swapchainSupport.presentModes.resize(count);
+  vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &count, swapchainSupport.presentModes.data());
+
+  return swapchainSupport;
+}
+GFVL_SwapchainConfig GFVL_SelectSwapchainConfig(const GFVL_SwapchainSupport &swapchainSupport, SDL_Window *window) {
+  GFVL_SwapchainConfig swapchainConfiguration{};
+  
+  // pick random format at first
   swapchainConfiguration.format = swapchainSupport.formats[0].format;
   swapchainConfiguration.colorSpace = swapchainSupport.formats[0].colorSpace;
 
+  // try to get ideal format
   for (const VkSurfaceFormatKHR &surfaceFormat : swapchainSupport.formats) {
-    if (surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB) {
+    if (surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB && surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
       swapchainConfiguration.format = surfaceFormat.format;
       swapchainConfiguration.colorSpace = surfaceFormat.colorSpace;
       break;
     }
   }
 
-  swapchainConfiguration.presentMode = VK_PRESENT_MODE_FIFO_KHR;
-
-  if (!vsync) {
-    for (VkPresentModeKHR presentationMode : swapchainSupport.presentModes) {
-      if (presentationMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-        swapchainConfiguration.presentMode = presentationMode;
-        break;
-      }
-    }
-  }
+  swapchainConfiguration.presentMode = VK_PRESENT_MODE_FIFO_KHR; // immediate mode for vsync off
 
   if (swapchainSupport.capabilities.currentExtent.width != UINT32_MAX) {
     swapchainConfiguration.extent = swapchainSupport.capabilities.currentExtent;
@@ -482,8 +477,7 @@ GFVL_SwapchainConfig GFVL_SelectSwapchainConfig(const GFVL_SwapchainSupport &swa
 
   uint32_t imageCount = swapchainSupport.capabilities.minImageCount + 1;
 
-  if (swapchainSupport.capabilities.maxImageCount > 0 &&
-      imageCount > swapchainSupport.capabilities.maxImageCount) {
+  if (swapchainSupport.capabilities.maxImageCount > 0 && imageCount > swapchainSupport.capabilities.maxImageCount) {
     imageCount = swapchainSupport.capabilities.maxImageCount;
   }
 
@@ -491,56 +485,39 @@ GFVL_SwapchainConfig GFVL_SelectSwapchainConfig(const GFVL_SwapchainSupport &swa
 
   return swapchainConfiguration;
 }
-GFVL_SwapchainSupport GFVL_QuerySwapchainSupport(VkPhysicalDevice device, VkSurfaceKHR surface) {
-  GFVL_SwapchainSupport s{};
-
-  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &s.capabilities);
-
-  uint32_t count = 0;
-
-  vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, nullptr);
-  s.formats.resize(count);
-  vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, s.formats.data());
-
-  vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &count, nullptr);
-  s.presentModes.resize(count);
-  vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &count, s.presentModes.data());
-
-  return s;
-}
-void GFVL_BuildSwapchain(GFVL_Swapchain &sc, const GFVL_SwapchainConfig &c) {
+void GFVL_BuildSwapchain(GFVL_Swapchain &swapchain, const GFVL_SwapchainConfig &swapchainConfig, const GFVL_SwapchainSupport &swapchainSupport) {
   VkSwapchainCreateInfoKHR info{
       .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-      .surface = sc.surface,
-      .minImageCount = c.imageCount,
-      .imageFormat = c.format,
-      .imageColorSpace = c.colorSpace,
-      .imageExtent = c.extent,
+      .surface = swapchain.surface,
+      .minImageCount = swapchainConfig.imageCount,
+      .imageFormat = swapchainConfig.format,
+      .imageColorSpace = swapchainConfig.colorSpace,
+      .imageExtent = swapchainConfig.extent,
       .imageArrayLayers = 1,
       .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
       .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
-      .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+      .preTransform = swapchainSupport.capabilities.currentTransform,
       .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-      .presentMode = c.presentMode,
+      .presentMode = swapchainConfig.presentMode,
       .clipped = VK_TRUE,
       .oldSwapchain = VK_NULL_HANDLE};
 
-  CheckVkResult(vkCreateSwapchainKHR(sc.device, &info, nullptr, &sc.swapchain));
+  CheckVkResult(vkCreateSwapchainKHR(swapchain.device, &info, nullptr, &swapchain.swapchain));
 
   uint32_t count = 0;
-  vkGetSwapchainImagesKHR(sc.device, sc.swapchain, &count, nullptr);
+  vkGetSwapchainImagesKHR(swapchain.device, swapchain.swapchain, &count, nullptr);
 
-  sc.images.resize(count);
-  vkGetSwapchainImagesKHR(sc.device, sc.swapchain, &count, sc.images.data());
+  swapchain.images.resize(count);
+  vkGetSwapchainImagesKHR(swapchain.device, swapchain.swapchain, &count, swapchain.images.data());
 
-  sc.imageViews.resize(count);
+  swapchain.imageViews.resize(count);
 
   for (size_t i = 0; i < count; i++) {
     VkImageViewCreateInfo vi{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .image = sc.images[i],
+        .image = swapchain.images[i],
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format = c.format,
+        .format = swapchainConfig.format,
         .components = {VK_COMPONENT_SWIZZLE_IDENTITY,
                        VK_COMPONENT_SWIZZLE_IDENTITY,
                        VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -550,18 +527,18 @@ void GFVL_BuildSwapchain(GFVL_Swapchain &sc, const GFVL_SwapchainConfig &c) {
             .levelCount = 1,
             .layerCount = 1}};
 
-    CheckVkResult(vkCreateImageView(sc.device, &vi, nullptr, &sc.imageViews[i]));
+    CheckVkResult(vkCreateImageView(swapchain.device, &vi, nullptr, &swapchain.imageViews[i]));
   }
 
-  sc.format = c.format;
-  sc.extent = c.extent;
-  sc.presentMode = c.presentMode;
-  sc.imageCount = count;
+  swapchain.format = swapchainConfig.format;
+  swapchain.extent = swapchainConfig.extent;
+  swapchain.presentMode = swapchainConfig.presentMode;
+  swapchain.imageCount = count;
 }
 void GFVL_DestroySwapchain(GFVL_Swapchain &sc) {
   vkDeviceWaitIdle(sc.device);
 
-  for (auto v : sc.imageViews)
+  for (VkImageView v : sc.imageViews)
     vkDestroyImageView(sc.device, v, nullptr);
 
   if (sc.swapchain)
@@ -570,13 +547,13 @@ void GFVL_DestroySwapchain(GFVL_Swapchain &sc) {
   sc.imageViews.clear();
   sc.images.clear();
 }
-void GFVL_RecreateSwapchain(GFVL_Swapchain &sc, bool vsync) {
+void GFVL_RecreateSwapchain(GFVL_Swapchain &sc) {
   GFVL_DestroySwapchain(sc);
 
-  auto support = GFVL_QuerySwapchainSupport(sc.physicalDevice, sc.surface);
-  auto config = GFVL_SelectSwapchainConfig(support, sc.window, vsync);
+  GFVL_SwapchainSupport support = GFVL_QuerySwapchainSupport(sc.physicalDevice, sc.surface);
+  GFVL_SwapchainConfig config = GFVL_SelectSwapchainConfig(support, sc.window);
 
-  GFVL_BuildSwapchain(sc, config);
+  GFVL_BuildSwapchain(sc, config, support);
 }
 int main() {
   if (!SDL_Init(SDL_INIT_VIDEO))
@@ -602,23 +579,12 @@ int main() {
   VkInstance instance = GFVL_InitializeVkInstance(&appInfo);
   VkSurfaceKHR surface = GFVL_InitializeVkSurface(instance, window);
 
-  GFVL_PHYSICAL_DEVICE physicalDevice =
-      GFVL_InitializePhysicalDevice(
-          instance,
-          surface,
-          GFVL_PREFERRED_GPU_POWER_SAVING);
-
+  GFVL_PHYSICAL_DEVICE physicalDevice = GFVL_InitializePhysicalDevice(instance, surface, GFVL_PREFERRED_GPU_POWER_SAVING);
   uint32_t graphicsFamilyIndex = 0;
 
-  VkDeviceQueueCreateInfo queueInfo =
-      GFVL_InitializeQueueCreation(
-          physicalDevice.graphicsFamilyIndex,
-          surface,
-          physicalDevice.device,
-          &graphicsFamilyIndex);
+  VkDeviceQueueCreateInfo queueInfo = GFVL_InitializeQueueCreation(physicalDevice.graphicsFamilyIndex, surface, physicalDevice.device, &graphicsFamilyIndex);
 
-  std::vector<const char *> deviceExtensions =
-      GFVL_EnumerateDeviceExtensions(physicalDevice.device);
+  std::vector<const char *> deviceExtensions = GFVL_EnumerateDeviceExtensions(physicalDevice.device);
 
   VkDevice device;
 
@@ -629,12 +595,7 @@ int main() {
       .enabledExtensionCount = (uint32_t)deviceExtensions.size(),
       .ppEnabledExtensionNames = deviceExtensions.data()};
 
-  CheckVkResult(
-      vkCreateDevice(
-          physicalDevice.device,
-          &deviceInfo,
-          nullptr,
-          &device));
+  CheckVkResult(vkCreateDevice(physicalDevice.device, &deviceInfo, nullptr, &device));
 
   VkQueue graphicsQueue;
   vkGetDeviceQueue(device, graphicsFamilyIndex, 0, &graphicsQueue);
@@ -645,15 +606,13 @@ int main() {
   swapchain.surface = surface;
   swapchain.window = window;
 
-  auto initialSupport = GFVL_QuerySwapchainSupport(physicalDevice.device, surface);
+  GFVL_SwapchainSupport initialSupport = GFVL_QuerySwapchainSupport(physicalDevice.device, surface);
 
-  auto initialConfig =
-      GFVL_SelectSwapchainConfig(
-          initialSupport,
-          window,
-          true);
+  GFVL_SwapchainConfig initialConfig = GFVL_SelectSwapchainConfig(initialSupport, window);
+  GFVL_BuildSwapchain(swapchain, initialConfig, initialSupport);
+  
+  // i hate my life
 
-  GFVL_BuildSwapchain(swapchain, initialConfig);
 
   bool running = true;
   bool framebufferResized = false;
@@ -677,14 +636,10 @@ int main() {
 
     if (framebufferResized) {
       vkDeviceWaitIdle(device);
-
-      GFVL_RecreateSwapchain(swapchain, true);
-
+      GFVL_RecreateSwapchain(swapchain);
       framebufferResized = false;
-
       std::cout << "[GFVL] Swapchain recreated due to resize\n";
     }
-
   }
 
   vkDeviceWaitIdle(device);
