@@ -13,11 +13,10 @@ get_target_property(
     SDL3::SDL3
     INTERFACE_INCLUDE_DIRECTORIES
 )
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
 message(STATUS "SDL includes = ${SDL_INCLUDES}")
-add_executable(main
-    src/main.cpp
-)
+add_executable(main ${SOURCES})
 
 target_link_libraries(main PRIVATE
     SDL3::SDL3
