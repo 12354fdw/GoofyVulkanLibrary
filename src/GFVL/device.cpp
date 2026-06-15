@@ -275,6 +275,7 @@ DEVICE::DEVICE(PREFERRED_GPU preferred_gpu, VkInstance instance, VkSurfaceKHR su
   }
 }
 DEVICE::~DEVICE() {
-  vkDestroyDevice(this->device, nullptr)
+  std::cout << "destroying \n";
+  vkDestroyDevice(this->device, nullptr);
 }
 }
