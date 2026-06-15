@@ -54,7 +54,7 @@ namespace GFVL {
     std::cout << VkResultToString(result) << " (" << static_cast<int>(result) << ")\n";
   }
   VkResult CheckVkResult(VkResult result) {
-    if (result < 0) {
+    if (result != VK_SUCCESS) {
       std::cout << "[GFVL] Error! : " << VkResultToString(result) << " (" << static_cast<int>(result) << ")\n";
       throw std::runtime_error("[GFVL] Error detected. read the above message");
     }
