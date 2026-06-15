@@ -26,6 +26,11 @@ namespace GFVL {
     DEVICE(VkInstance instance, VkSurfaceKHR surface, PREFERRED_GPU preference);
     ~DEVICE();
 
+    DEVICE(const DEVICE &) = delete;
+    DEVICE &operator=(const DEVICE &) = delete;
+
+    DEVICE(const DEVICE &&) = delete;
+    DEVICE &operator=(const DEVICE &&) = delete;
   };
 
   VkInstance InitializeVkInstance(VkApplicationInfo *appInfo);

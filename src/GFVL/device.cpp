@@ -1,9 +1,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 #include <cstdint>
-#include <cstdlib>
 #include <cstring>
-#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -12,20 +10,6 @@
 #include "GFVL.hpp"
 using namespace GFVL;
 
-// order of operation
-/*
-InitializePhysicalDevice
-  EvaluatePhysicalDevice
-    EnumerateQueueFamilies
-    HasRequiredDeviceExtensions
-    GetDeviceVRAM *
-    CalculateDeviceScore *
-  
-InitializeQueueCreation
-EnumerateDeviceExtensions
-
-
-*/
 VkDeviceSize getDeviceVRAM(VkPhysicalDevice device) {
   VkPhysicalDeviceMemoryProperties memoryProperties{};
   vkGetPhysicalDeviceMemoryProperties(device, &memoryProperties);
@@ -93,8 +77,11 @@ VkBool32 enumerateQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface, u
       presentFamilyIndex = i;
       break;
     }
-    if (graphicsSupport) graphicsFamilyIndex = i;
-    if (presentationSupport) presentFamilyIndex = i;
+    if (graphicsSupport && graphicsFamilyIndex == UINT32_MAX)
+      graphicsFamilyIndex = i;
+
+    if (presentationSupport && presentFamilyIndex == UINT32_MAX)
+      presentFamilyIndex = i;
   }
 
   return graphicsFamilyIndex != UINT32_MAX && presentFamilyIndex != UINT32_MAX;
@@ -134,9 +121,10 @@ std::vector<const char *> enumerateDeviceExtensions(VkPhysicalDevice device) {
     }
   }
 
-  if (enabledDeviceExtensions.empty())
+  if (enabledDeviceExtensions.empty()) {
     throw std::runtime_error("[GFVL] Required extension VK_KHR_swapchain not found.");
-    DEBUG_PRINT("Enabled device extension count: " << enabledDeviceExtensions.size())
+  }
+  DEBUG_PRINT("Enabled device extension count: " << enabledDeviceExtensions.size())
 
   return enabledDeviceExtensions;
 }
@@ -149,10 +137,10 @@ DEVICE::DEVICE(VkInstance instance, VkSurfaceKHR surface, PREFERRED_GPU preferen
     throw std::runtime_error("[GFVL] No Vulkan-compatible GPUs found.");
   std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
 
-  CheckVkResult(vkEnumeratePhysicalDevices(instance,&physicalDeviceCount,physicalDevices.data()));
+  CheckVkResult(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, physicalDevices.data()));
 
   if (DEBUG_MODE)
-    std::cout << "[GFVL] Found "<< physicalDeviceCount<< " Vulkan-compatible devices.\n";
+    std::cout << "[GFVL] Found " << physicalDeviceCount << " Vulkan-compatible devices.\n";
 
   int bestScore = -1;
 
@@ -210,7 +198,6 @@ DEVICE::DEVICE(VkInstance instance, VkSurfaceKHR surface, PREFERRED_GPU preferen
         std::cout << "  Score: " << getDeviceScore(physicalDevice, preference) << '\n';
       }
     }
-  
   }
   if (this->physicalDevice == VK_NULL_HANDLE)
     throw std::runtime_error("[GFVL] No suitable Vulkan device found.");
@@ -219,7 +206,7 @@ DEVICE::DEVICE(VkInstance instance, VkSurfaceKHR surface, PREFERRED_GPU preferen
     VkPhysicalDeviceProperties properties{};
     vkGetPhysicalDeviceProperties(this->physicalDevice, &properties);
 
-    std::cout << "[GFVL] Selected Device: "<< properties.deviceName<< '\n';
+    std::cout << "[GFVL] Selected Device: " << properties.deviceName << '\n';
     std::cout << "[GFVL] Graphics Queue Family: " << this->graphicsFamilyIndex << '\n';
     std::cout << "[GFVL] Present Queue Family: " << this->presentFamilyIndex << '\n';
     std::cout << "[GFVL] Dedicated VRAM: " << this->videoMemory / (1024ull * 1024ull) << " MB\n";
@@ -227,22 +214,34 @@ DEVICE::DEVICE(VkInstance instance, VkSurfaceKHR surface, PREFERRED_GPU preferen
   }
 
   const float queuePriority = 1.0f;
-  VkDeviceQueueCreateInfo queueCreateInfo{
-      .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-      .pNext = nullptr,
-      .flags = 0,
-      .queueFamilyIndex = graphicsFamilyIndex,
-      .queueCount = 1,
-      .pQueuePriorities = &queuePriority};
-  
+  std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+  // why the hell does it indent like this when i paste the code
+  queueCreateInfos.push_back({.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                              .queueFamilyIndex = graphicsFamilyIndex,
+                              .queueCount = 1,
+                              .pQueuePriorities = &queuePriority});
+
+  if (presentFamilyIndex != graphicsFamilyIndex) {
+    queueCreateInfos.push_back({.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                                .queueFamilyIndex = graphicsFamilyIndex,
+                                .queueCount = 1,
+                                .pQueuePriorities = &queuePriority});
+  }
+
   std::vector<const char *> deviceExtensions = enumerateDeviceExtensions(this->physicalDevice);
   VkDeviceCreateInfo deviceInfo{
       .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .queueCreateInfoCount = 1,
-      .pQueueCreateInfos = &queueCreateInfo,
+      .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
+      .pQueueCreateInfos = queueCreateInfos.data(),
       .enabledExtensionCount = (uint32_t)deviceExtensions.size(),
       .ppEnabledExtensionNames = deviceExtensions.data()};
 
   CheckVkResult(vkCreateDevice(this->physicalDevice, &deviceInfo, nullptr, &this->logicalDevice));
 }
+DEVICE::~DEVICE() {
+  if (logicalDevice != VK_NULL_HANDLE) {
+    vkDestroyDevice(logicalDevice, nullptr);
+    logicalDevice = VK_NULL_HANDLE;
+  }
 }
+} // namespace GFVL
