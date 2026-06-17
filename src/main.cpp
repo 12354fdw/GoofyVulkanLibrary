@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -106,7 +105,7 @@ int main() {
   std::vector<GFVL::SHADER> shaderStages;
   shaderStages.emplace_back(device, VK_SHADER_STAGE_VERTEX_BIT, "src/vertex_shader.spv");
   shaderStages.emplace_back(device, VK_SHADER_STAGE_FRAGMENT_BIT, "src/fragment_shader.spv");
-  
+
   GFVL::VERTEX_LAYOUT layout = {
       .binding = {.stride = sizeof(vertice)},
   };

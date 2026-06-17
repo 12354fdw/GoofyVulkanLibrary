@@ -2,10 +2,6 @@
 #include <SDL3/SDL_vulkan.h>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
-#include <fstream>
-#include <stdexcept>
-#include <filesystem>
 #include <vector>
 #include <vulkan/vulkan.h>
 
