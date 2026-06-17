@@ -226,7 +226,7 @@ DEVICE::DEVICE(VkInstance instance, VkSurfaceKHR surface, PREFERRED_GPU preferen
 
   if (presentFamilyIndex != graphicsFamilyIndex) {
     queueCreateInfos.push_back({.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-                                .queueFamilyIndex = graphicsFamilyIndex,
+                                .queueFamilyIndex = presentFamilyIndex,
                                 .queueCount = 1,
                                 .pQueuePriorities = &queuePriority});
   }
