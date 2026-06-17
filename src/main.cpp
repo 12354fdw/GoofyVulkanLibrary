@@ -93,41 +93,8 @@ VkShaderModule createShaderModule(const std::vector<char> &code, VkDevice device
   CheckVkResult(vkCreateShaderModule(device, &shaderCreationInfo, nullptr, &shaderModule));
   return shaderModule;
 }
-VkInstance GFVL_InitializeVkInstance(VkApplicationInfo *appInfo) {
-  uint32_t instanceExtensionCount = 0;
-  const char *const *instanceExtensions = SDL_Vulkan_GetInstanceExtensions(&instanceExtensionCount);
 
-  if (GFVL::DEBUG_MODE) { // optionally print the info
-    std::cout << "[GFVL] GFVL_InitializeVkInstance \n";
-    if (instanceExtensions == NULL)
-      std::cout << "[GFVL] No instance extensions supported.. What?" << "\n";
-    std::cout << "[GFVL] Detected instance extensions :\n";
-    for (uint32_t i = 0; i < instanceExtensionCount; i++)
-      std::cout << "  " << instanceExtensions[i] << '\n';
-  }
 
-  VkInstanceCreateInfo instanceCreationInfo = {
-      .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-      .pNext = NULL,
-      .flags = 0,
-      .pApplicationInfo = appInfo,
-      .enabledExtensionCount = instanceExtensionCount,
-      .ppEnabledExtensionNames = instanceExtensions};
-
-  VkInstance instance;
-  CheckVkResult(vkCreateInstance(
-      &instanceCreationInfo,
-      NULL,
-      &instance));
-
-  return instance;
-}
-VkSurfaceKHR GFVL_InitializeVkSurface(VkInstance instance, SDL_Window *window) {
-  VkSurfaceKHR surface;
-  if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface))
-    std::cout << "[GFVL] SDL error : " << SDL_GetError() << '\n';
-  return surface;
-}
 // USER-DEFINED STUFF
 struct GFVL_VERTEX_LAYOUT {
   VkVertexInputBindingDescription binding{
@@ -156,6 +123,7 @@ struct GFVL_VERTEX_LAYOUT {
 
 struct vertice {
   float position[3];
+  float color[3];
 };
 int main() {
   if (!SDL_Init(SDL_INIT_VIDEO))
@@ -178,14 +146,13 @@ int main() {
       .engineVersion = 1,
       .apiVersion = VK_API_VERSION_1_3};
 
-  VkInstance instance = GFVL_InitializeVkInstance(&appInfo);
-  VkSurfaceKHR surface = GFVL_InitializeVkSurface(instance, window);
+  VkInstance instance = GFVL::InitializeVkInstance(&appInfo);
+  VkSurfaceKHR surface;
+  if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface))
+    std::cout << "[GFVL] SDL error : " << SDL_GetError() << '\n';
 
   GFVL::DEVICE device(instance, surface, GFVL::PREFERRED_GPU_POWER_SAVING);
   GFVL::SWAPCHAIN swapchain(device, window, surface);
-
-  VkQueue graphicsQueue;
-  vkGetDeviceQueue(device.logicalDevice, device.graphicsFamilyIndex, 0, &graphicsQueue);
 
   // i hate my life
   VkShaderModule vertexShaderModule = createShaderModule(readFile("src/vertex_shader.spv"), device.logicalDevice);
@@ -202,6 +169,11 @@ int main() {
       .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
       .module = fragmentShaderModule,
       .pName = "main"};
+
+  // shader stages
+  VkPipelineShaderStageCreateInfo stages[] = {
+      vertexShaderStageInfo,
+      fragmentShaderStageInfo};
 
   std::vector<VkDynamicState> dynamicStates = {
       VK_DYNAMIC_STATE_VIEWPORT,
@@ -332,11 +304,6 @@ int main() {
       .attachmentCount = 1,
       .pAttachments = &colorBlendAttachment};
 
-  // shader stages
-  VkPipelineShaderStageCreateInfo stages[] = {
-      vertexShaderStageInfo,
-      fragmentShaderStageInfo};
-
   // pipeline
   VkGraphicsPipelineCreateInfo pipelineInfo{
       .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -422,9 +389,9 @@ int main() {
 
   std::vector<vertice> vertices =
       {
-          {{0.0f, -0.5f, 0.0f}},
-          {{0.5f, 0.5f, 0.0f}},
-          {{-0.5f, 0.5f, 0.0f}}};
+          {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+          {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+          {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}};
 
   VkBuffer vertexBuffer;
   VkDeviceMemory vertexBufferMemory;
@@ -708,7 +675,7 @@ int main() {
 
     CheckVkResult(
         vkQueueSubmit(
-            graphicsQueue,
+            device.graphicsQueue,
             1,
             &submitInfo,
             inFlightFence));
@@ -730,7 +697,7 @@ int main() {
 
     CheckVkResult(
         vkQueuePresentKHR(
-            graphicsQueue,
+            device.graphicsQueue,
             &presentInfo));
   }
 

@@ -22,6 +22,7 @@ namespace GFVL {
     VkDeviceSize videoMemory = 0;
     uint32_t graphicsFamilyIndex = UINT32_MAX;
     uint32_t presentFamilyIndex = UINT32_MAX;
+    VkQueue graphicsQueue = {};
 
     DEVICE(VkInstance instance, VkSurfaceKHR surface, PREFERRED_GPU preference);
     ~DEVICE();

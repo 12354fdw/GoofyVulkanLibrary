@@ -73,6 +73,7 @@ VkBool32 enumerateQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface, u
     CheckVkResult(vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentationSupport));
 
     if (graphicsSupport && presentationSupport) {
+      DEBUG_PRINT("Found a queue family with both graphics support and presentation support!")
       graphicsFamilyIndex = i;
       presentFamilyIndex = i;
       break;
@@ -153,50 +154,52 @@ DEVICE::DEVICE(VkInstance instance, VkSurfaceKHR surface, PREFERRED_GPU preferen
       continue;
 
     const int candidateScore = getDeviceScore(physicalDevice, preference);
+
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+
+    const VkDeviceSize dedicatedVideoMemory = getDeviceVRAM(physicalDevice);
+    if (DEBUG_MODE) {
+      std::cout << "[GFVL] Device\n";
+      std::cout << "  Name: " << properties.deviceName << '\n';
+      std::cout << "  API Version: " << VK_VERSION_MAJOR(properties.apiVersion) << '.' << VK_VERSION_MINOR(properties.apiVersion) << '.' << VK_VERSION_PATCH(properties.apiVersion) << '\n';
+      std::cout << "  Driver Version: " << properties.driverVersion << '\n';
+      std::cout << "  Vendor ID: " << properties.vendorID << '\n';
+      std::cout << "  Device ID: " << properties.deviceID << '\n';
+      std::cout << "  Graphics Family Index: " << graphicsFamilyIndex << '\n';
+      std::cout << "  Present Family Index: " << presentFamilyIndex << '\n';
+      std::cout << "  Dedicated VRAM: " << dedicatedVideoMemory / (1024ull * 1024ull) << " MB\n";
+
+      switch (properties.deviceType) {
+      case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+        std::cout << "  Type: Discrete GPU\n";
+        break;
+
+      case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+        std::cout << "  Type: Integrated GPU\n";
+        break;
+
+      case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+        std::cout << "  Type: Virtual GPU\n";
+        break;
+
+      case VK_PHYSICAL_DEVICE_TYPE_CPU:
+        std::cout << "  Type: CPU\n";
+        break;
+
+      default:
+        std::cout << "  Type: Other\n";
+        break;
+      }
+
+      std::cout << "  Score: " << getDeviceScore(physicalDevice, preference) << '\n';
+    }
     if (candidateScore > bestScore) {
       bestScore = candidateScore;
-
-      VkPhysicalDeviceProperties properties{};
-      vkGetPhysicalDeviceProperties(physicalDevice, &properties);
-
-      const VkDeviceSize dedicatedVideoMemory = getDeviceVRAM(physicalDevice);
       this->physicalDevice = physicalDevice;
       this->videoMemory = dedicatedVideoMemory;
       this->graphicsFamilyIndex = graphicsFamilyIndex;
       this->presentFamilyIndex = presentFamilyIndex;
-      if (DEBUG_MODE) {
-        std::cout << "[GFVL] Device\n";
-        std::cout << "  Name: " << properties.deviceName << '\n';
-        std::cout << "  API Version: " << VK_VERSION_MAJOR(properties.apiVersion) << '.' << VK_VERSION_MINOR(properties.apiVersion) << '.' << VK_VERSION_PATCH(properties.apiVersion) << '\n';
-        std::cout << "  Driver Version: " << properties.driverVersion << '\n';
-        std::cout << "  Vendor ID: " << properties.vendorID << '\n';
-        std::cout << "  Device ID: " << properties.deviceID << '\n';
-        std::cout << "  Dedicated VRAM: " << dedicatedVideoMemory / (1024ull * 1024ull) << " MB\n";
-
-        switch (properties.deviceType) {
-        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-          std::cout << "  Type: Discrete GPU\n";
-          break;
-
-        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-          std::cout << "  Type: Integrated GPU\n";
-          break;
-
-        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
-          std::cout << "  Type: Virtual GPU\n";
-          break;
-
-        case VK_PHYSICAL_DEVICE_TYPE_CPU:
-          std::cout << "  Type: CPU\n";
-          break;
-
-        default:
-          std::cout << "  Type: Other\n";
-          break;
-        }
-
-        std::cout << "  Score: " << getDeviceScore(physicalDevice, preference) << '\n';
-      }
     }
   }
   if (this->physicalDevice == VK_NULL_HANDLE)
@@ -237,6 +240,7 @@ DEVICE::DEVICE(VkInstance instance, VkSurfaceKHR surface, PREFERRED_GPU preferen
       .ppEnabledExtensionNames = deviceExtensions.data()};
 
   CheckVkResult(vkCreateDevice(this->physicalDevice, &deviceInfo, nullptr, &this->logicalDevice));
+  vkGetDeviceQueue(this->logicalDevice, this->graphicsFamilyIndex, 0, &this->graphicsQueue);
 }
 DEVICE::~DEVICE() {
   if (logicalDevice != VK_NULL_HANDLE) {
