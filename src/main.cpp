@@ -114,22 +114,7 @@ int main() {
 
   GFVL::PIPELINE pipeline(device, swapchain, layout, shaderStages, renderPass);
   GFVL::FRAMEBUFFER framebuffers(device, swapchain, renderPass);
-  std::vector<VkCommandBuffer> commandBuffers;
-
-  commandBuffers.resize(framebuffers.framebuffers.size());
-
-  VkCommandBufferAllocateInfo allocInfo{
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-      .commandPool = commandPool,
-      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-      .commandBufferCount =
-          static_cast<uint32_t>(commandBuffers.size())};
-
-  CheckVkResult(
-      vkAllocateCommandBuffers(
-          device.logicalDevice,
-          &allocInfo,
-          commandBuffers.data()));
+  GFVL::COMMAND_POOL commandPool(device, framebuffers);
 
   std::vector<vertice> vertices =
       {
@@ -225,14 +210,14 @@ int main() {
   // COMMAND BUFFER RECORDING
   // =============================
 
-  for (size_t i = 0; i < commandBuffers.size(); i++) {
+  for (size_t i = 0; i < commandPool.commandBuffers.size(); i++) {
 
     VkCommandBufferBeginInfo beginInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
 
     CheckVkResult(
         vkBeginCommandBuffer(
-            commandBuffers[i],
+            commandPool.commandBuffers[i],
             &beginInfo));
 
     VkClearValue clearColor{
@@ -250,19 +235,19 @@ int main() {
         .pClearValues = &clearColor};
 
     vkCmdBeginRenderPass(
-        commandBuffers[i],
+        commandPool.commandBuffers[i],
         &renderPassInfo,
         VK_SUBPASS_CONTENTS_INLINE);
 
     vkCmdBindPipeline(
-        commandBuffers[i],
+        commandPool.commandBuffers[i],
         VK_PIPELINE_BIND_POINT_GRAPHICS,
         pipeline.pipeline);
 
     VkDeviceSize offsets[] = {0};
 
     vkCmdBindVertexBuffers(
-        commandBuffers[i],
+        commandPool.commandBuffers[i],
         0,
         1,
         &vertexBuffer,
@@ -276,7 +261,7 @@ int main() {
         .maxDepth = 1.0f};
 
     vkCmdSetViewport(
-        commandBuffers[i],
+        commandPool.commandBuffers[i],
         0,
         1,
         &viewport);
@@ -286,23 +271,23 @@ int main() {
         .extent = swapchain.extent};
 
     vkCmdSetScissor(
-        commandBuffers[i],
+        commandPool.commandBuffers[i],
         0,
         1,
         &scissor);
     vkCmdDraw(
-        commandBuffers[i],
+        commandPool.commandBuffers[i],
         static_cast<uint32_t>(vertices.size()),
         1,
         0,
         0);
 
     vkCmdEndRenderPass(
-        commandBuffers[i]);
+        commandPool.commandBuffers[i]);
 
     CheckVkResult(
         vkEndCommandBuffer(
-            commandBuffers[i]));
+            commandPool.commandBuffers[i]));
   }
 
   // =============================
@@ -412,7 +397,7 @@ int main() {
         .pWaitDstStageMask = waitStages,
 
         .commandBufferCount = 1,
-        .pCommandBuffers = &commandBuffers[imageIndex],
+        .pCommandBuffers = &commandPool.commandBuffers[imageIndex],
 
         .signalSemaphoreCount = 1,
         .pSignalSemaphores = signalSemaphores};

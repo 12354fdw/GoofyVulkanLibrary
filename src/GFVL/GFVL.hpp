@@ -164,8 +164,9 @@ namespace GFVL {
   class COMMAND_POOL {
   public:
     VkCommandPool commandPool;
-    
-    COMMAND_POOL(DEVICE& device);
+    std::vector<VkCommandBuffer> commandBuffers;
+
+    COMMAND_POOL(DEVICE& device, FRAMEBUFFER& framebuffer);
     ~COMMAND_POOL();
 
     COMMAND_POOL(const COMMAND_POOL &) = delete;
