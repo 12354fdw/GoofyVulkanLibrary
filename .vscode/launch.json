@@ -3,7 +3,7 @@
     "configurations": [
         {
             "name": "giggity",
-            "type": "cppbdg",
+            "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}\\build\\main.exe",
             "args": [],

@@ -11,9 +11,11 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include<glm/gtc/matrix_transform.hpp>
 #define print(message) std::cout << message << "\n";
-
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 // Remove-Item build -Recurse -Force; cmake -B build -DCMAKE_PREFIX_PATH=C:/msys64/ucrt64 -G Ninja
 // cmake --build build --verbose; build/main.exe
 // glslc src/vertex_shader.vert -o src/vertex_shader.spv
@@ -88,13 +90,87 @@ void setViewport(VkCommandBuffer& commandBuffer, GFVL::SWAPCHAIN& swapchain) {
 
 struct vertice {
   float position[3];
+  float normal[3];
   float color[3];
 };
 struct CameraUBO {
-  glm::vec3 position;
-  glm::vec3 angle;
+  glm::mat4 MVP;
+  glm::vec3 viewPos;
+  glm::vec3 viewDir;
 };
 
+void insertCube(glm::vec3 position, glm::vec3 color, glm::vec3 scale, std::vector<vertice> &vertices) {
+  std::vector<vertice> cube = {
+      // Front face (z = -0.5)
+      {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}},
+      {{0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}},
+      {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}},
+
+      {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}},
+      {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}},
+      {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}},
+
+      // Back face (z = 0.5)
+      {{0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+      {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+      {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+
+      {{0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+      {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+      {{0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+
+      // Left face (x = -0.5)
+      {{-0.5f, -0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}},
+      {{-0.5f, -0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}},
+      {{-0.5f, 0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}},
+
+      {{-0.5f, -0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}},
+      {{-0.5f, 0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}},
+      {{-0.5f, 0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}},
+
+      // Right face (x = 0.5)
+      {{0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+      {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}},
+      {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}},
+
+      {{0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+      {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}},
+      {{0.5f, 0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+
+      // Bottom face (y = -0.5)
+      {{-0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}},
+      {{0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}},
+      {{0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}},
+
+      {{-0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}},
+      {{0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}},
+      {{-0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}},
+
+      // Top face (y = 0.5)
+      {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+      {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+      {{0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+
+      {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+      {{0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+      {{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}}};
+
+  for (vertice &vert : cube) {
+    vert.position[0] *= scale.x;
+    vert.position[1] *= scale.y;
+    vert.position[2] *= scale.z;
+
+    vert.position[0] += position.x;
+    vert.position[1] += position.y;
+    vert.position[2] += position.z;
+
+    vert.color[0] = color.x;
+    vert.color[1] = color.y;
+    vert.color[2] = color.z;
+  }
+
+  vertices.insert(vertices.end(), cube.begin(), cube.end());
+}
 int main() {
   if (!SDL_Init(SDL_INIT_VIDEO))
     throw std::runtime_error(SDL_GetError());
@@ -133,6 +209,7 @@ int main() {
 
   GFVL::VERTEX_LAYOUT layout(sizeof(vertice));
   layout.addAttribute(VK_FORMAT_R32G32B32_SFLOAT, offsetof(vertice, position));
+  layout.addAttribute(VK_FORMAT_R32G32B32_SFLOAT, offsetof(vertice, normal));
   layout.addAttribute(VK_FORMAT_R32G32B32_SFLOAT, offsetof(vertice, color));
 
   VkBuffer uniformBuffer;
@@ -197,8 +274,6 @@ int main() {
   GFVL::FRAMEBUFFER framebuffers(device, swapchain, renderPass);
   CameraUBO camera{};
 
-  camera.position = glm::vec3(0,0,-1);
-  camera.angle = glm::vec3(0, 0, 0);
   void *data;
 
   vkMapMemory(
@@ -269,63 +344,14 @@ int main() {
       0,
       nullptr);
   GFVL::COMMAND_POOL commandPool(device, framebuffers);
-  std::vector<vertice> vertices =
-      {
-          // Front face (z = -0.5)
-          {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-          {{0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}},
-          {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-
-          {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-          {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-          {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}},
-
-          // Back face (z = 0.5)
-          {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}},
-          {{-0.5f, -0.5f, 0.5f}, {0.0f, 1.0f, 1.0f}},
-          {{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-
-          {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}},
-          {{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-          {{0.5f, 0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
-
-          // Left face (x = -0.5)
-          {{-0.5f, -0.5f, 0.5f}, {0.0f, 1.0f, 1.0f}},
-          {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-          {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}},
-
-          {{-0.5f, -0.5f, 0.5f}, {0.0f, 1.0f, 1.0f}},
-          {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}},
-          {{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-
-          // Right face (x = 0.5)
-          {{0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}},
-          {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}},
-          {{0.5f, 0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
-
-          {{0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}},
-          {{0.5f, 0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
-          {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-
-          // Bottom face (y = -0.5)
-          {{-0.5f, -0.5f, 0.5f}, {0.0f, 1.0f, 1.0f}},
-          {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}},
-          {{0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}},
-
-          {{-0.5f, -0.5f, 0.5f}, {0.0f, 1.0f, 1.0f}},
-          {{0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}},
-          {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-
-          // Top face (y = 0.5)
-          {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}},
-          {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-          {{0.5f, 0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
-
-          {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}},
-          {{0.5f, 0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
-          {{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 1.0f}}};
+  std::vector<vertice> vertices;
+  insertCube(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(1.0f, 1.0f, 1.0f), vertices);
+  insertCube(glm::vec3(2.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(1.0f, 2.5f, 1.0f), vertices);
+  insertCube(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(1.0f, 2.5f, 1.0f), vertices);
   GFVL::VERTEX_BUFFER vertexBuffer(device, vertices.capacity() * sizeof(vertice), vertices.data());
 
+  // melica.uwu
+  // dino_potato__  
   VkSemaphore imageAvailable; // can i render?
   VkSemaphore renderFinished; // am i done rendering my stuff?
 
@@ -342,8 +368,12 @@ int main() {
   bool framebufferResized = false;
   float speed = 1.0f;
 
+  float aspect = SDL_GetWindowAspectRatio(window, NULL, NULL);
   uint64_t last_time = SDL_GetPerformanceCounter();
-  double delta_time = 0.0; // In seconds
+  float delta_time = 0.0; // In seconds
+
+  glm::vec3 position(0,0,0);
+  glm::quat angle;
   while (running) {
     uint64_t current_time = SDL_GetPerformanceCounter();
     delta_time = (double)(current_time - last_time) / (double)SDL_GetPerformanceFrequency();
@@ -360,6 +390,22 @@ int main() {
       if (event.type == SDL_EVENT_WINDOW_RESIZED ||
           event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
         framebufferResized = true;
+      if (event.type == SDL_EVENT_MOUSE_MOTION) {
+        static float yaw = 0.0f;
+        static float pitch = 0.0f;
+
+        float sens = 0.002f;
+
+        yaw -= event.motion.xrel * sens;
+        pitch += event.motion.yrel * sens;
+
+        pitch = glm::clamp(pitch, -1.5f, 1.5f);
+
+        glm::quat qYaw = glm::angleAxis(yaw, glm::vec3(0, 1, 0));
+        glm::quat qPitch = glm::angleAxis(pitch, glm::vec3(1, 0, 0));
+
+        angle = glm::normalize(qYaw * qPitch);
+      }
     }
 
     if (framebufferResized) {
@@ -367,38 +413,42 @@ int main() {
       swapchain.recreateSwapchain(window, surface);
       framebuffers.recreate(swapchain, renderPass);
       framebufferResized = false;
+      aspect = SDL_GetWindowAspectRatio(window, NULL, NULL);
     }
 
     const bool *keyboard = SDL_GetKeyboardState(nullptr);
     float speed = 5.0f;
-    float deltaTime = 1.0f / 60.0f; // replace with your real delta time
+    glm::vec3 forward = angle * glm::vec3(0, 0, -1);
+    glm::vec3 right = angle * glm::vec3(1, 0, 0);
 
-    glm::vec3 forward;
-
-    forward.x = sin(camera.angle.y);
-    forward.y = 0.0f;
-    forward.z = -cos(camera.angle.y);
     if (keyboard[SDL_SCANCODE_W]) {
-      camera.position += forward * speed * deltaTime;
+      position += forward * speed * delta_time;
     }
 
     if (keyboard[SDL_SCANCODE_S]) {
-      camera.position -= forward * speed * deltaTime;
+      position -= forward * speed * delta_time;
     }
-
-    glm::vec3 right;
-
-    right.x = cos(camera.angle.y);
-    right.y = 0.0f;
-    right.z = sin(camera.angle.y);
-
     if (keyboard[SDL_SCANCODE_A]) {
-      camera.position -= right * speed * deltaTime;
+      position -= right * speed * delta_time;
     }
 
     if (keyboard[SDL_SCANCODE_D]) {
-      camera.position += right * speed * deltaTime;
-    }
+      position += right * speed * delta_time;
+    } 
+
+    glm::mat4 proj = glm::perspectiveRH_ZO(
+        glm::radians(90.0f),
+        aspect,
+        0.01f,
+        100.0f);
+
+    glm::mat4 view =
+        glm::mat4_cast(glm::conjugate(angle)) *
+        glm::translate(glm::mat4(1.0f), -position);
+
+    camera.MVP = proj * view;
+    camera.viewPos = position;
+    camera.viewDir = glm::eulerAngles(angle);
 
     vkWaitForFences(device.logicalDevice, 1, &inFlightFence, VK_TRUE, UINT64_MAX);
     vkResetFences(device.logicalDevice, 1, &inFlightFence);
@@ -413,6 +463,9 @@ int main() {
     CheckVkResult(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
     VkClearValue clearColor{.color = {0.05f, 0.05f, 0.05f, 1.0f}};
+    VkClearValue clearValues[2]{};
+    clearValues[0].color = {{0.05f, 0.05f, 0.05f, 1.0f}};
+    clearValues[1].depthStencil = {1.0f, 0};
 
     VkRenderPassBeginInfo renderPassInfo{
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -421,8 +474,8 @@ int main() {
         .renderArea = {
             .offset = {0, 0},
             .extent = swapchain.extent},
-        .clearValueCount = 1,
-        .pClearValues = &clearColor};
+        .clearValueCount = 2,
+        .pClearValues = clearValues};
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 

@@ -149,6 +149,11 @@ namespace GFVL {
 
   private:
     DEVICE &device;
+
+    VkImage depthImage{};
+    VkDeviceMemory depthMemory{};
+    VkImageView depthImageView{};
+    VkFormat depthFormat{};
   };
 
   class COMMAND_POOL {

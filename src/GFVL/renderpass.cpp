@@ -8,6 +8,21 @@ using namespace GFVL;
 // USER-DEFINED STUFF
 namespace GFVL {
 RENDERPASS::RENDERPASS(DEVICE &device, SWAPCHAIN &swapchain) : device(device)  {
+
+  VkAttachmentDescription depthAttachment{
+      .format = VK_FORMAT_D32_SFLOAT,
+      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+      .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+      .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+      .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+      .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+      .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+
+  VkAttachmentReference depthAttachmentRef{
+      .attachment = 1,
+      .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+
   VkAttachmentDescription colorAttachment{
       .format = swapchain.format,
       .samples = VK_SAMPLE_COUNT_1_BIT, // enable for multisamping
@@ -25,14 +40,20 @@ RENDERPASS::RENDERPASS(DEVICE &device, SWAPCHAIN &swapchain) : device(device)  {
   VkSubpassDescription subpass{
       .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
       .colorAttachmentCount = 1,
-      .pColorAttachments = &colorAttachmentRef};
+      .pColorAttachments = &colorAttachmentRef,
+      .pDepthStencilAttachment = &depthAttachmentRef};
 
+  std::vector<VkAttachmentDescription> attachments = {
+      colorAttachment,
+      depthAttachment};
+      
   VkRenderPassCreateInfo renderPassInfo{
       .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-      .attachmentCount = 1,
-      .pAttachments = &colorAttachment,
+      .attachmentCount = static_cast<uint32_t>(attachments.size()),
+      .pAttachments = attachments.data(),
       .subpassCount = 1,
       .pSubpasses = &subpass};
+
 
   CheckVkResult(vkCreateRenderPass(device.logicalDevice, &renderPassInfo, nullptr, &this->renderPass));
 }
