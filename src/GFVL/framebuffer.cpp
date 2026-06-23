@@ -189,8 +189,8 @@ void FRAMEBUFFER::recreate(SWAPCHAIN &swapchain, RENDERPASS &renderPass) {
   vkDestroyImage(device.logicalDevice, depthImage, nullptr);
   vkFreeMemory(device.logicalDevice, depthMemory, nullptr);
 
-  depthFormat = VK_FORMAT_D32_SFLOAT; // safe default, you can re-detect if you want
-
+  depthFormat = VK_FORMAT_D32_SFLOAT; // idk
+  
   auto createImage = [&](uint32_t w, uint32_t h) {
     VkImageCreateInfo info{
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,

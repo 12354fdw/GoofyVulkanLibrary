@@ -10,207 +10,228 @@
 #define DEBUG_PRINT(message) std::cout << "[GFVL] " << message << "\n";
 #define ERROR(message) throw std::runtime_error(message);
 namespace GFVL {
-  const bool DEBUG_MODE = true;
-  
-  enum PREFERRED_GPU {
-    PREFERRED_GPU_POWER_SAVING,
-    PREFERRED_GPU_PERFORMANCE,
-  };
+const bool DEBUG_MODE = true;
+class PIPELINE;
+enum PREFERRED_GPU {
+  PREFERRED_GPU_POWER_SAVING,
+  PREFERRED_GPU_PERFORMANCE,
+};
 
-  class VERTEX_LAYOUT {
-    public:
-    VkVertexInputBindingDescription binding;
+class VERTEX_LAYOUT {
+public:
+  VkVertexInputBindingDescription binding;
 
-    std::vector<VkVertexInputAttributeDescription> attributes;
+  std::vector<VkVertexInputAttributeDescription> attributes;
 
-    void addAttribute(VkFormat format, uint32_t offset);
-    
-    VERTEX_LAYOUT(uint32_t size);
-  };
+  void addAttribute(VkFormat format, uint32_t offset);
 
-  class DEVICE {
-    public:
-    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    VkDevice logicalDevice = VK_NULL_HANDLE;
-    VkDeviceSize videoMemory = 0;
+  VERTEX_LAYOUT(uint32_t size);
+};
 
-    uint32_t graphicsFamilyIndex = UINT32_MAX;
-    uint32_t presentFamilyIndex = UINT32_MAX;
-    
-    VkQueue graphicsQueue = {};
+class DEVICE {
+public:
+  VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+  VkDevice logicalDevice = VK_NULL_HANDLE;
+  VkDeviceSize videoMemory = 0;
 
-    DEVICE(VkInstance instance, VkSurfaceKHR surface, PREFERRED_GPU preference);
-    ~DEVICE();
+  uint32_t graphicsFamilyIndex = UINT32_MAX;
+  uint32_t presentFamilyIndex = UINT32_MAX;
 
-    DEVICE(const DEVICE &) = delete;
-    DEVICE &operator=(const DEVICE &) = delete;
+  VkQueue graphicsQueue = {};
 
-    DEVICE(const DEVICE &&) = delete;
-    DEVICE &operator=(const DEVICE &&) = delete;
-  };
+  DEVICE(VkInstance instance, VkSurfaceKHR surface, PREFERRED_GPU preference);
+  ~DEVICE();
 
-  class SWAPCHAIN {
-    public:
+  DEVICE(const DEVICE &) = delete;
+  DEVICE &operator=(const DEVICE &) = delete;
 
-    VkSwapchainKHR swapchain{};
+  DEVICE(const DEVICE &&) = delete;
+  DEVICE &operator=(const DEVICE &&) = delete;
+};
 
-    VkFormat format{};
-    VkExtent2D extent{};
-    VkPresentModeKHR presentMode{};
-    uint32_t imageCount{};
+class SWAPCHAIN {
+public:
+  VkSwapchainKHR swapchain{};
 
-    std::vector<VkImage> images;
-    std::vector<VkImageView> imageViews;
+  VkFormat format{};
+  VkExtent2D extent{};
+  VkPresentModeKHR presentMode{};
+  uint32_t imageCount{};
 
-    bool framebufferResized = false;
+  std::vector<VkImage> images;
+  std::vector<VkImageView> imageViews;
 
-    void recreateSwapchain(SDL_Window *window, VkSurfaceKHR surface);
-    SWAPCHAIN(DEVICE &device, SDL_Window *window, VkSurfaceKHR surface);
-    ~SWAPCHAIN();
+  bool framebufferResized = false;
 
-    SWAPCHAIN(const SWAPCHAIN &) = delete;
-    SWAPCHAIN &operator=(const SWAPCHAIN &) = delete;
+  void recreateSwapchain(SDL_Window *window, VkSurfaceKHR surface);
+  SWAPCHAIN(DEVICE &device, SDL_Window *window, VkSurfaceKHR surface);
+  ~SWAPCHAIN();
 
-    SWAPCHAIN(const SWAPCHAIN &&) = delete;
-    SWAPCHAIN &operator=(const SWAPCHAIN &&) = delete;
+  SWAPCHAIN(const SWAPCHAIN &) = delete;
+  SWAPCHAIN &operator=(const SWAPCHAIN &) = delete;
 
-  private:
-    DEVICE &device;
-  };
+  SWAPCHAIN(const SWAPCHAIN &&) = delete;
+  SWAPCHAIN &operator=(const SWAPCHAIN &&) = delete;
 
-  class SHADER {
-  public:
-    VkShaderModule shaderModule = {};
-    VkShaderStageFlagBits stage;
+private:
+  DEVICE &device;
+};
 
-    SHADER(DEVICE &device, VkShaderStageFlagBits stage, const char *filename);
-    ~SHADER();
+class SHADER {
+public:
+  VkShaderModule shaderModule = {};
+  VkShaderStageFlagBits stage;
 
-    SHADER(const SHADER &) = delete;
-    SHADER &operator=(const SHADER &) = delete;
+  SHADER(DEVICE &device, VkShaderStageFlagBits stage, const char *filename);
+  ~SHADER();
 
-    SHADER(SHADER&& other) noexcept;
-    SHADER &operator=(SHADER&& other) noexcept;
+  SHADER(const SHADER &) = delete;
+  SHADER &operator=(const SHADER &) = delete;
 
-  private:
-    DEVICE &device;
-  };
+  SHADER(SHADER &&other) noexcept;
+  SHADER &operator=(SHADER &&other) noexcept;
 
-  class RENDERPASS {
-  public:
-    VkRenderPass renderPass = {};
+private:
+  DEVICE &device;
+};
 
-    RENDERPASS(DEVICE &device, SWAPCHAIN &swapchain);
-    ~RENDERPASS();
+class RENDERPASS {
+public:
+  VkRenderPass renderPass = {};
 
-    RENDERPASS(const RENDERPASS &) = delete;
-    RENDERPASS &operator=(const RENDERPASS &) = delete;
+  RENDERPASS(DEVICE &device, SWAPCHAIN &swapchain);
+  ~RENDERPASS();
 
-    RENDERPASS(const RENDERPASS &&) = delete;
-    RENDERPASS &operator=(const RENDERPASS &&) = delete;
+  RENDERPASS(const RENDERPASS &) = delete;
+  RENDERPASS &operator=(const RENDERPASS &) = delete;
 
-  private:
-    DEVICE &device;
-  };
+  RENDERPASS(const RENDERPASS &&) = delete;
+  RENDERPASS &operator=(const RENDERPASS &&) = delete;
 
-  class PIPELINE {
-  public:
-    VkPipelineLayout pipelineLayout;
-    VkPipeline pipeline = {};
+private:
+  DEVICE &device;
+};
 
-    PIPELINE(DEVICE &device, SWAPCHAIN &swapchain, VERTEX_LAYOUT &layout, std::vector<SHADER> &shaderStages, RENDERPASS &renderPass, std::vector<VkDescriptorSetLayout> descriptorLayouts);
-    ~PIPELINE();
+class UNIFORM_BUFFER {
+public:
+  std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+  VkDeviceMemory uniformBufferMemory;
+  VkDescriptorSet descriptorSet;
+  void *data;
 
-    PIPELINE(const PIPELINE &) = delete;
-    PIPELINE &operator=(const PIPELINE &) = delete;
+  void bindData(VkCommandBuffer &commandBuffer, PIPELINE &pipeline, void *data);
+  UNIFORM_BUFFER(DEVICE &device, size_t uboSize, void *ubo);
+  ~UNIFORM_BUFFER();
 
-    PIPELINE(const PIPELINE &&) = delete;
-    PIPELINE &operator=(const PIPELINE &&) = delete;
+  UNIFORM_BUFFER(const UNIFORM_BUFFER &) = delete;
+  UNIFORM_BUFFER &operator=(const UNIFORM_BUFFER &) = delete;
 
-  private:
-    DEVICE &device;
-  };
+  UNIFORM_BUFFER(const UNIFORM_BUFFER &&) = delete;
+  UNIFORM_BUFFER &operator=(const UNIFORM_BUFFER &&) = delete;
 
-  class FRAMEBUFFER {
-  public:
-    std::vector<VkFramebuffer> framebuffers;
+private:
+  DEVICE &device;
+  VkBuffer uniformBuffer;
+  uint32_t size;
+  VkDescriptorPool descriptorPool;
+};
 
-    void recreate(SWAPCHAIN &swapchain, RENDERPASS &renderPass);
-    FRAMEBUFFER(DEVICE &device, SWAPCHAIN &swapchain, RENDERPASS &renderPass);
-    ~FRAMEBUFFER();
+class PIPELINE {
+public:
+  VkPipelineLayout pipelineLayout;
+  VkPipeline pipeline = {};
 
-    
+  PIPELINE(DEVICE &device, SWAPCHAIN &swapchain, VERTEX_LAYOUT &layout, std::vector<SHADER> &shaderStages, RENDERPASS &renderPass, UNIFORM_BUFFER &uniformBuffer);
+  ~PIPELINE();
 
-    FRAMEBUFFER(const FRAMEBUFFER &) = delete;
-    FRAMEBUFFER &operator=(const FRAMEBUFFER &) = delete;
+  PIPELINE(const PIPELINE &) = delete;
+  PIPELINE &operator=(const PIPELINE &) = delete;
 
-    FRAMEBUFFER(const FRAMEBUFFER &&) = delete;
-    FRAMEBUFFER &operator=(const FRAMEBUFFER &&) = delete;
+  PIPELINE(const PIPELINE &&) = delete;
+  PIPELINE &operator=(const PIPELINE &&) = delete;
 
-  private:
-    DEVICE &device;
+private:
+  DEVICE &device;
+};
 
-    VkImage depthImage{};
-    VkDeviceMemory depthMemory{};
-    VkImageView depthImageView{};
-    VkFormat depthFormat{};
-  };
+class FRAMEBUFFER {
+public:
+  std::vector<VkFramebuffer> framebuffers;
 
-  class COMMAND_POOL {
-  public:
-    VkCommandPool commandPool;
-    std::vector<VkCommandBuffer> commandBuffers;
+  void recreate(SWAPCHAIN &swapchain, RENDERPASS &renderPass);
+  FRAMEBUFFER(DEVICE &device, SWAPCHAIN &swapchain, RENDERPASS &renderPass);
+  ~FRAMEBUFFER();
 
-    COMMAND_POOL(DEVICE& device, FRAMEBUFFER& framebuffer);
-    ~COMMAND_POOL();
+  FRAMEBUFFER(const FRAMEBUFFER &) = delete;
+  FRAMEBUFFER &operator=(const FRAMEBUFFER &) = delete;
 
-    COMMAND_POOL(const COMMAND_POOL &) = delete;
-    COMMAND_POOL &operator=(const COMMAND_POOL &) = delete;
+  FRAMEBUFFER(const FRAMEBUFFER &&) = delete;
+  FRAMEBUFFER &operator=(const FRAMEBUFFER &&) = delete;
 
-    COMMAND_POOL(const COMMAND_POOL &&) = delete;
-    COMMAND_POOL &operator=(const COMMAND_POOL &&) = delete;
+private:
+  DEVICE &device;
 
-  private:
-    DEVICE &device;
-  };
+  VkImage depthImage{};
+  VkDeviceMemory depthMemory{};
+  VkImageView depthImageView{};
+  VkFormat depthFormat{};
+};
 
-  class VERTEX_BUFFER {
-  public:
-    VkBuffer vertexBuffer;
-    VkDeviceMemory vertexBufferMemory;
-    VkDeviceSize size;
+class COMMAND_POOL {
+public:
+  VkCommandPool commandPool;
+  std::vector<VkCommandBuffer> commandBuffers;
 
-    VERTEX_BUFFER(DEVICE &device, VkDeviceSize size, void *inputData);
-    ~VERTEX_BUFFER();
+  COMMAND_POOL(DEVICE &device, FRAMEBUFFER &framebuffer);
+  ~COMMAND_POOL();
 
-    VERTEX_BUFFER(const VERTEX_BUFFER &) = delete;
-    VERTEX_BUFFER &operator=(const VERTEX_BUFFER &) = delete;
+  COMMAND_POOL(const COMMAND_POOL &) = delete;
+  COMMAND_POOL &operator=(const COMMAND_POOL &) = delete;
 
-    VERTEX_BUFFER(const VERTEX_BUFFER &&) = delete;
-    VERTEX_BUFFER &operator=(const COMMAND_POOL &&) = delete;
+  COMMAND_POOL(const COMMAND_POOL &&) = delete;
+  COMMAND_POOL &operator=(const COMMAND_POOL &&) = delete;
 
-  private:
-    DEVICE &device;
-    VkBufferCreateInfo bufferInfo;
-    void* data;
-  };
+private:
+  DEVICE &device;
+};
 
-  class MESH {
-    size_t vertice_size;
-    uint32_t vertice_count;
-    size_t mesh_size;
-    void* data;
+class VERTEX_BUFFER {
+public:
+  VkBuffer vertexBuffer;
+  VkDeviceMemory vertexBufferMemory;
+  VkDeviceSize size;
 
-    MESH(size_t vertice_size, uint32_t vertice_count);
-    ~MESH();
-  };
-  VkInstance InitializeVkInstance(VkApplicationInfo *appInfo);
-  // defined in GFVL.cpp
-  std::vector<char> readFile(const std::string &filename);
-  const char *VkResultToString(VkResult result);
-  void PrintVkResult(VkResult result);
-  VkResult CheckVkResult(VkResult result);
-  uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties);
-}
+  VERTEX_BUFFER(DEVICE &device, VkDeviceSize size, void *inputData);
+  ~VERTEX_BUFFER();
+
+  VERTEX_BUFFER(const VERTEX_BUFFER &) = delete;
+  VERTEX_BUFFER &operator=(const VERTEX_BUFFER &) = delete;
+
+  VERTEX_BUFFER(const VERTEX_BUFFER &&) = delete;
+  VERTEX_BUFFER &operator=(const VERTEX_BUFFER &&) = delete;
+
+private:
+  DEVICE &device;
+  VkBufferCreateInfo bufferInfo;
+  void *data;
+};
+
+class MESH {
+  size_t vertice_size;
+  uint32_t vertice_count;
+  size_t mesh_size;
+  void *data;
+
+  MESH(size_t vertice_size, uint32_t vertice_count);
+  ~MESH();
+};
+VkInstance InitializeVkInstance(VkApplicationInfo *appInfo);
+// defined in GFVL.cpp
+std::vector<char> readFile(const std::string &filename);
+const char *VkResultToString(VkResult result);
+void PrintVkResult(VkResult result);
+VkResult CheckVkResult(VkResult result);
+uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties);
+} // namespace GFVL
 
 #endif

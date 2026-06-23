@@ -10,10 +10,10 @@ using namespace GFVL;
 
 // USER-DEFINED STUFF
 namespace GFVL {
-PIPELINE::PIPELINE(DEVICE &device, SWAPCHAIN &swapchain, VERTEX_LAYOUT &layout, std::vector<SHADER> &shaderStages, RENDERPASS &renderPass, std::vector<VkDescriptorSetLayout> descriptorLayouts) : device(device) {
+PIPELINE::PIPELINE(DEVICE& device, SWAPCHAIN& swapchain, VERTEX_LAYOUT& layout, std::vector<SHADER>& shaderStages, RENDERPASS& renderPass, UNIFORM_BUFFER& uniformBuffer) : device(device) {
   std::vector<VkPipelineShaderStageCreateInfo> stages(shaderStages.size());
   size_t index = 0;
-  for (const SHADER &shader : shaderStages) {
+  for (const SHADER& shader : shaderStages) {
     stages[index] = VkPipelineShaderStageCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .stage = shader.stage,
@@ -31,10 +31,10 @@ PIPELINE::PIPELINE(DEVICE &device, SWAPCHAIN &swapchain, VERTEX_LAYOUT &layout, 
       .pDynamicStates = dynamicStates.data()};
 
   VkPipelineLayoutCreateInfo info{
-    .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-    .setLayoutCount = static_cast<uint32_t>(descriptorLayouts.size()),
-    .pSetLayouts = descriptorLayouts.data()
-    };
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+      .setLayoutCount = static_cast<uint32_t>(uniformBuffer.descriptorSetLayouts.size()),
+      .pSetLayouts = uniformBuffer.descriptorSetLayouts.data()};
+      
   vkCreatePipelineLayout(device.logicalDevice, &info, nullptr, &this->pipelineLayout);
 
   // vertex input

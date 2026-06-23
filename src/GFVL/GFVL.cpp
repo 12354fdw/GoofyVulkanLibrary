@@ -81,8 +81,8 @@ namespace GFVL {
         .pNext = NULL,
         .flags = 0,
         .pApplicationInfo = appInfo,
-        //.enabledLayerCount = 1,
-        //.ppEnabledLayerNames = &validationLayer,
+        .enabledLayerCount = 1,
+        .ppEnabledLayerNames = &validationLayer,
         .enabledExtensionCount = instanceExtensionCount,
         .ppEnabledExtensionNames = instanceExtensions,
     };

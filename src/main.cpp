@@ -211,149 +211,23 @@ int main() {
   layout.addAttribute(VK_FORMAT_R32G32B32_SFLOAT, offsetof(vertice, normal));
   layout.addAttribute(VK_FORMAT_R32G32B32_SFLOAT, offsetof(vertice, color));
 
-  VkBuffer uniformBuffer;
-  VkBufferCreateInfo bufferInfo{
-      .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-      .size = sizeof(CameraUBO),
-      .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-      .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
-
-  CheckVkResult(vkCreateBuffer(
-      device.logicalDevice,
-      &bufferInfo,
-      nullptr,
-      &uniformBuffer));
-
-  VkDeviceMemory uniformBufferMemory;
-  VkMemoryRequirements memRequirements;
-
-  vkGetBufferMemoryRequirements(
-      device.logicalDevice,
-      uniformBuffer,
-      &memRequirements);
-
-  VkMemoryAllocateInfo memoryAllocatonInfo{
-      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-      .allocationSize = memRequirements.size,
-      .memoryTypeIndex = GFVL::findMemoryType(device.physicalDevice, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT), 
-  };
-
-  CheckVkResult(vkAllocateMemory(
-      device.logicalDevice,
-      &memoryAllocatonInfo,
-      nullptr,
-      &uniformBufferMemory));
-
-  vkBindBufferMemory(
-      device.logicalDevice,
-      uniformBuffer,
-      uniformBufferMemory,
-      0);
-
-  VkDescriptorSetLayoutBinding cameraBinding{
-      .binding = 0,
-      .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-      .descriptorCount = 1,
-      .stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS};
-
-  VkDescriptorSetLayoutCreateInfo descriptorInfo{
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-      .bindingCount = 1,
-      .pBindings = &cameraBinding};
-
-  std::vector<VkDescriptorSetLayout> descriptorSetLayouts(1);
-
-  CheckVkResult(vkCreateDescriptorSetLayout(
-      device.logicalDevice,
-      &descriptorInfo,
-      nullptr,
-      &descriptorSetLayouts[0]));
-
-  GFVL::PIPELINE pipeline(device, swapchain, layout, shaderStages, renderPass, descriptorSetLayouts);
-  GFVL::FRAMEBUFFER framebuffers(device, swapchain, renderPass);
   CameraUBO camera{};
+  GFVL::UNIFORM_BUFFER uniformBuffer(device, sizeof(CameraUBO), &camera);
+  GFVL::PIPELINE pipeline(device, swapchain, layout, shaderStages, renderPass, uniformBuffer);
+  GFVL::FRAMEBUFFER framebuffers(device, swapchain, renderPass);
 
-  void *data;
-
-  vkMapMemory(
-      device.logicalDevice,
-      uniformBufferMemory,
-      0,
-      sizeof(CameraUBO),
-      0,
-      &data);
-
-  memcpy(data, &camera, sizeof(CameraUBO));
-
-  vkUnmapMemory(
-      device.logicalDevice,
-      uniformBufferMemory);
-
-  // joke hed
-
-  VkDescriptorPoolSize poolSize{
-      .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-      .descriptorCount = 1};
-
-  VkDescriptorPoolCreateInfo poolInfo{
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-      .maxSets = 1,
-      .poolSizeCount = 1,
-      .pPoolSizes = &poolSize};
-
-  VkDescriptorPool descriptorPool;
-
-  CheckVkResult(vkCreateDescriptorPool(
-      device.logicalDevice,
-      &poolInfo,
-      nullptr,
-      &descriptorPool));
-
-  VkDescriptorSet cameraDescriptorSet;
-
-  VkDescriptorSetAllocateInfo descriptorSetAllocationInfo{
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-      .descriptorPool = descriptorPool,
-      .descriptorSetCount = 1,
-      .pSetLayouts = &descriptorSetLayouts[0]};
-
-  CheckVkResult(vkAllocateDescriptorSets(
-      device.logicalDevice,
-      &descriptorSetAllocationInfo,
-      &cameraDescriptorSet));
-
-  VkDescriptorBufferInfo descriptorBufferInfo{
-      .buffer = uniformBuffer,
-      .offset = 0,
-      .range = sizeof(CameraUBO)};
-
-  VkWriteDescriptorSet descriptorWrite{
-      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet = cameraDescriptorSet,
-      .dstBinding = 0,
-      .dstArrayElement = 0,
-      .descriptorCount = 1,
-      .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-      .pBufferInfo = &descriptorBufferInfo};
-
-  vkUpdateDescriptorSets(
-      device.logicalDevice,
-      1,
-      &descriptorWrite,
-      0,
-      nullptr);
   GFVL::COMMAND_POOL commandPool(device, framebuffers);
   std::vector<vertice> vertices;
-  int start = -20;
-  int end = 20;
+  int start = -35;
+  int end = 35;
   int steps = end - start;
 
   float xI = 0;
   float yI = 0;
   float zI = 0;
 
-  float spacing = 2.0f;
-  float scale = 1.0f;
+  float spacing = 50.0f;
+  float scale = 10.0f;
   
   for (int x = start; x < end; x++) {
     for (int y = start; y < end; y++) {
@@ -517,33 +391,12 @@ int main() {
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
 
-    vkCmdBindDescriptorSets(
-        commandBuffer,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        pipeline.pipelineLayout,
-        0,
-        1,
-        &cameraDescriptorSet,
-        0,
-        nullptr);
+    uniformBuffer.bindData(commandBuffer, pipeline, &camera);
     setViewport(commandBuffer, swapchain);
     VkDeviceSize offsets[] = {0};
 
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.vertexBuffer, offsets);
 
-    vkMapMemory(
-        device.logicalDevice,
-        uniformBufferMemory,
-        0,
-        sizeof(CameraUBO),
-        0,
-        &data);
-
-    memcpy(data, &camera, sizeof(CameraUBO));
-
-    vkUnmapMemory(
-        device.logicalDevice,
-        uniformBufferMemory);
 
     vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 
@@ -581,12 +434,7 @@ int main() {
   } 
 
   vkDeviceWaitIdle(device.logicalDevice);
-  vkDestroyBuffer(device.logicalDevice, uniformBuffer, nullptr);
-  vkFreeMemory(device.logicalDevice, uniformBufferMemory, nullptr);
-  for (auto& layout : descriptorSetLayouts) {
-    vkDestroyDescriptorSetLayout(device.logicalDevice, layout, nullptr);
-  }
-  vkDestroyDescriptorPool(device.logicalDevice, descriptorPool, nullptr);
+
 
   vkDestroyFence(device.logicalDevice, inFlightFence, nullptr);
 
