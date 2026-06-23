@@ -344,8 +344,8 @@ int main() {
       nullptr);
   GFVL::COMMAND_POOL commandPool(device, framebuffers);
   std::vector<vertice> vertices;
-  int start = -25;
-  int end = 25;
+  int start = -20;
+  int end = 20;
   int steps = end - start;
 
   float xI = 0;
@@ -353,7 +353,8 @@ int main() {
   float zI = 0;
 
   float spacing = 2.0f;
-  float scale = 2.0f;
+  float scale = 1.0f;
+  
   for (int x = start; x < end; x++) {
     for (int y = start; y < end; y++) {
       for (int z = start; z < end; z++) {
@@ -410,7 +411,7 @@ int main() {
     uint64_t current_time = SDL_GetPerformanceCounter();
     delta_time = (double)(current_time - last_time) / (double)SDL_GetPerformanceFrequency();
     last_time = current_time;
-    
+
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
