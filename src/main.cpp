@@ -344,18 +344,34 @@ int main() {
       nullptr);
   GFVL::COMMAND_POOL commandPool(device, framebuffers);
   std::vector<vertice> vertices;
-  for (int x = -25; x < 50; x++) {
-    for (int y = -25; y < 50; y++) {
-      for (int z = -25; z < 50; z++) {
+  int start = -25;
+  int end = 25;
+  int steps = end - start;
+  float xI = 0;
+  float yI = 0;
+  float zI = 0;
+  for (int x = start; x < end; x++) {
+    for (int y = start; y < end; y++) {
+      for (int z = start; z < end; z++) {
         insertCube(glm::vec3(
           static_cast<float>(x) * 8.0f,
           static_cast<float>(y) * 8.0f,
           static_cast<float>(z) * 8.0f),
-           glm::vec3(1.0f, 1.0f, 1.0f), 
-           glm::vec3(1.8f, 1.8f, 1.8f), vertices
-          );
+          glm::vec3(
+            xI/steps,
+            yI/steps,
+            zI/steps
+          ), 
+          glm::vec3(1.8f, 1.8f, 1.8f), vertices
+        );
+        //print("xI : " << (xI/steps) << "yI : " << (yI/steps) << "zI : " << (zI/steps))
+        zI++;
       }
+      zI = 0;
+      yI++;
     }
+    yI = 0;
+    xI++;
   }
   print(vertices.size())
   GFVL::VERTEX_BUFFER vertexBuffer(device, vertices.size() * sizeof(vertice), vertices.data());
@@ -437,6 +453,11 @@ int main() {
     glm::vec3 forward = angle * glm::vec3(0, 0, -1);
     glm::vec3 right = angle * glm::vec3(1, 0, 0);
 
+    if (keyboard[SDL_SCANCODE_LSHIFT]) {
+      speed = 100.0f;
+    } else {
+      speed = 5.0f;
+    }
     if (keyboard[SDL_SCANCODE_W]) {
       position += forward * speed * delta_time;
     }
@@ -450,7 +471,7 @@ int main() {
 
     if (keyboard[SDL_SCANCODE_D]) {
       position += right * speed * delta_time;
-    } 
+    }
 
     glm::mat4 proj = glm::perspectiveRH_ZO(
         glm::radians(90.0f),

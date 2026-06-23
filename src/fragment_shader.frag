@@ -16,8 +16,8 @@ void main()
     vec3 lightPos = vec3(100.0, 100.0, 50.0);
     vec3 lightColor = vec3(1.0, 1.0, 1.0); // do not go below 0.1f  
     vec3 normal = normalize(inNormal);
-    float ambient = 0.05;
-    float shininess = 128.0;
+    float ambient = 0.08;
+    float shininess = 256.0;
 
     vec3 lightDir   = normalize(lightPos - inPosition);
     vec3 viewDir    = normalize(ubo.viewPos - inPosition);
