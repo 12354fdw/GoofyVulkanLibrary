@@ -8,7 +8,7 @@ using namespace GFVL;
 
 // USER-DEFINED STUFF
 namespace GFVL {
-UNIFORM_BUFFER::UNIFORM_BUFFER(DEVICE &device, size_t uboSize, void *ubo) : device(device), descriptorSetLayouts(1), size(uboSize) {
+UNIFORM_BUFFER::UNIFORM_BUFFER(DEVICE &device, size_t uboSize, void *ubo) : device(device), size(uboSize) {
   VkBufferCreateInfo uniformBufferInfo{
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .size = uboSize,
@@ -38,19 +38,9 @@ UNIFORM_BUFFER::UNIFORM_BUFFER(DEVICE &device, size_t uboSize, void *ubo) : devi
       .bindingCount = 1,
       .pBindings = &binding};
 
-  CheckVkResult(vkCreateDescriptorSetLayout(
-      device.logicalDevice,
-      &descriptorInfo,
-      nullptr,
-      &this->descriptorSetLayouts[0]));
+  CheckVkResult(vkCreateDescriptorSetLayout(device.logicalDevice, &descriptorInfo, nullptr, &this->descriptorSetLayout));
 
-  vkMapMemory(
-      device.logicalDevice,
-      this->uniformBufferMemory,
-      0,
-      uboSize,
-      0,
-      &this->data);
+  vkMapMemory(device.logicalDevice, this->uniformBufferMemory, 0, uboSize, 0, &this->data);
 
   memcpy(this->data, ubo, uboSize);
 
@@ -78,7 +68,7 @@ UNIFORM_BUFFER::UNIFORM_BUFFER(DEVICE &device, size_t uboSize, void *ubo) : devi
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
       .descriptorPool = this->descriptorPool,
       .descriptorSetCount = 1,
-      .pSetLayouts = &this->descriptorSetLayouts[0]};
+      .pSetLayouts = &this->descriptorSetLayout};
 
   CheckVkResult(vkAllocateDescriptorSets(
       device.logicalDevice,
@@ -106,35 +96,28 @@ UNIFORM_BUFFER::UNIFORM_BUFFER(DEVICE &device, size_t uboSize, void *ubo) : devi
       0,
       nullptr);
 }
-void UNIFORM_BUFFER::bindData(VkCommandBuffer &commandBuffer, PIPELINE &pipeline, void *data) {
+void UNIFORM_BUFFER::bind(VkCommandBuffer &commandBuffer, PIPELINE &pipeline, uint32_t set) {
   vkCmdBindDescriptorSets(
       commandBuffer,
       VK_PIPELINE_BIND_POINT_GRAPHICS,
       pipeline.pipelineLayout,
-      0,
+      set,
       1,
-      &this->descriptorSet,
+      &descriptorSet,
       0,
       nullptr);
-
-  vkMapMemory(
-      device.logicalDevice,
-      this->uniformBufferMemory,
-      0,
-      this->size,
-      0,
-      &this->data);
-
-  memcpy(this->data, data, this->size);
-
-  vkUnmapMemory(device.logicalDevice, this->uniformBufferMemory);
+}
+void UNIFORM_BUFFER::update(void *data) {
+  void *mapped;
+  vkMapMemory(device.logicalDevice, uniformBufferMemory, 0, size, 0, &mapped);
+  memcpy(mapped, data, size);
+  vkUnmapMemory(device.logicalDevice, uniformBufferMemory);
 }
 UNIFORM_BUFFER::~UNIFORM_BUFFER() {
   vkDestroyBuffer(device.logicalDevice, this->uniformBuffer, nullptr);
   vkFreeMemory(device.logicalDevice, this->uniformBufferMemory, nullptr);
-  for (auto &layout : this->descriptorSetLayouts) {
-    vkDestroyDescriptorSetLayout(device.logicalDevice, layout, nullptr);
-  }
+vkDestroyDescriptorSetLayout(device.logicalDevice, this->descriptorSetLayout, nullptr);
+
   vkDestroyDescriptorPool(device.logicalDevice, this->descriptorPool, nullptr);
 }
 } // namespace GFVL

@@ -114,12 +114,13 @@ private:
 
 class UNIFORM_BUFFER {
 public:
-  std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+  VkDescriptorSetLayout descriptorSetLayout;
   VkDeviceMemory uniformBufferMemory;
   VkDescriptorSet descriptorSet;
   void *data;
 
-  void bindData(VkCommandBuffer &commandBuffer, PIPELINE &pipeline, void *data);
+  void update(void *data);
+  void bind(VkCommandBuffer &commandBuffer, PIPELINE &pipeline, uint32_t set);
   UNIFORM_BUFFER(DEVICE &device, size_t uboSize, void *ubo);
   ~UNIFORM_BUFFER();
 
@@ -141,7 +142,7 @@ public:
   VkPipelineLayout pipelineLayout;
   VkPipeline pipeline = {};
 
-  PIPELINE(DEVICE &device, SWAPCHAIN &swapchain, VERTEX_LAYOUT &layout, std::vector<SHADER> &shaderStages, RENDERPASS &renderPass, UNIFORM_BUFFER &uniformBuffer);
+  PIPELINE(DEVICE &device, SWAPCHAIN &swapchain, VERTEX_LAYOUT &layout, std::vector<SHADER> &shaderStages, RENDERPASS &renderPass, std::vector<VkDescriptorSetLayout> layouts);
   ~PIPELINE();
 
   PIPELINE(const PIPELINE &) = delete;
@@ -232,6 +233,7 @@ const char *VkResultToString(VkResult result);
 void PrintVkResult(VkResult result);
 VkResult CheckVkResult(VkResult result);
 uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties);
+std::vector<VkDescriptorSetLayout> collectLayouts(const std::vector<UNIFORM_BUFFER *> &buffers);
 } // namespace GFVL
 
 #endif

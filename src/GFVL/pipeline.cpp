@@ -10,7 +10,7 @@ using namespace GFVL;
 
 // USER-DEFINED STUFF
 namespace GFVL {
-PIPELINE::PIPELINE(DEVICE& device, SWAPCHAIN& swapchain, VERTEX_LAYOUT& layout, std::vector<SHADER>& shaderStages, RENDERPASS& renderPass, UNIFORM_BUFFER& uniformBuffer) : device(device) {
+PIPELINE::PIPELINE(DEVICE &device, SWAPCHAIN &swapchain, VERTEX_LAYOUT &layout, std::vector<SHADER> &shaderStages, RENDERPASS &renderPass, std::vector<VkDescriptorSetLayout> layouts) : device(device) {
   std::vector<VkPipelineShaderStageCreateInfo> stages(shaderStages.size());
   size_t index = 0;
   for (const SHADER& shader : shaderStages) {
@@ -32,8 +32,8 @@ PIPELINE::PIPELINE(DEVICE& device, SWAPCHAIN& swapchain, VERTEX_LAYOUT& layout, 
 
   VkPipelineLayoutCreateInfo info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-      .setLayoutCount = static_cast<uint32_t>(uniformBuffer.descriptorSetLayouts.size()),
-      .pSetLayouts = uniformBuffer.descriptorSetLayouts.data()};
+      .setLayoutCount = static_cast<uint32_t>(layouts.size()),
+      .pSetLayouts = layouts.data()};
       
   vkCreatePipelineLayout(device.logicalDevice, &info, nullptr, &this->pipelineLayout);
 
@@ -47,7 +47,6 @@ PIPELINE::PIPELINE(DEVICE& device, SWAPCHAIN& swapchain, VERTEX_LAYOUT& layout, 
   ;
 
   // input assembly
-  // That morning just me and you, with azure views for two
   VkPipelineInputAssemblyStateCreateInfo inputAssembly{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
       .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,

@@ -1,6 +1,6 @@
 #version 450
 
-layout(binding = 0) uniform UBO {
+layout(binding = 0) uniform transform {
     mat4 MVP;
     vec3 viewPos;
 } ubo;

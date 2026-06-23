@@ -21,7 +21,7 @@
 // glslc src/vertex_shader.vert -o src/vertex_shader.spv
 // glslc src/fragment_shader.frag -o src/fragment_shader.spv
 
-// rm -Force src/fragment_shader.spv; rm -Force src/vertex_shader.spv; glslc src/vertex_shader.vert -o src/vertex_shader.spv; glslc src/fragment_shader.frag -o src/fragment_shader.spv;  cmake --build build --verbose; build/main.exe
+// rm -Force build/main.exe; rm -Force src/fragment_shader.spv; rm -Force src/vertex_shader.spv; glslc src/vertex_shader.vert -o src/vertex_shader.spv; glslc src/fragment_shader.frag -o src/fragment_shader.spv;  cmake --build build --verbose; build/main.exe
 
 const char *VkResultToString(VkResult result) {
   switch (result) {
@@ -97,6 +97,10 @@ struct CameraUBO {
   glm::mat4 MVP;
   alignas(16) glm::vec3 viewPos;
   float padding;
+};
+struct LightingUBO {
+  alignas(16) glm::vec3 lightPos;
+  alignas(16) glm::vec3 lightColor;
 };
 void insertCube(glm::vec3 position, glm::vec3 color, glm::vec3 scale, std::vector<vertice> &vertices) {
   std::vector<vertice> cube = {
@@ -174,11 +178,7 @@ int main() {
   if (!SDL_Init(SDL_INIT_VIDEO))
     throw std::runtime_error(SDL_GetError());
 
-  SDL_Window *window = SDL_CreateWindow(
-      "goofyVLib Example",
-      800,
-      600,
-      SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+  SDL_Window *window = SDL_CreateWindow("goofyVLib Example", 800, 600, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 
   if (!window)
     throw std::runtime_error(SDL_GetError());
@@ -212,11 +212,16 @@ int main() {
   layout.addAttribute(VK_FORMAT_R32G32B32_SFLOAT, offsetof(vertice, color));
 
   CameraUBO camera{};
-  GFVL::UNIFORM_BUFFER uniformBuffer(device, sizeof(CameraUBO), &camera);
-  GFVL::PIPELINE pipeline(device, swapchain, layout, shaderStages, renderPass, uniformBuffer);
+  GFVL::UNIFORM_BUFFER cameraUBO(device, sizeof(CameraUBO), &camera);
+
+  //LightingUBO lighting{.lightPos = glm::vec3(0.0f), .lightColor = glm::vec3(1.0f)};
+  //GFVL::UNIFORM_BUFFER lightingUBO(device, sizeof(LightingUBO), &lighting);
+
+  GFVL::PIPELINE pipeline(device, swapchain, layout, shaderStages, renderPass, GFVL::collectLayouts({&cameraUBO}));
   GFVL::FRAMEBUFFER framebuffers(device, swapchain, renderPass);
 
   GFVL::COMMAND_POOL commandPool(device, framebuffers);
+
   std::vector<vertice> vertices;
   int start = -35;
   int end = 35;
@@ -252,7 +257,7 @@ int main() {
     yI = 0;
     xI++;
   }
-  print(vertices.size())
+
   GFVL::VERTEX_BUFFER vertexBuffer(device, vertices.size() * sizeof(vertice), vertices.data());
 
   VkSemaphore imageAvailable; // can i render?
@@ -391,7 +396,9 @@ int main() {
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
 
-    uniformBuffer.bindData(commandBuffer, pipeline, &camera);
+    cameraUBO.bind(commandBuffer, pipeline, 0);
+    //lightingUBO.bind(commandBuffer, pipeline, 1);
+    cameraUBO.update(&camera);
     setViewport(commandBuffer, swapchain);
     VkDeviceSize offsets[] = {0};
 
