@@ -347,22 +347,26 @@ int main() {
   int start = -25;
   int end = 25;
   int steps = end - start;
+
   float xI = 0;
   float yI = 0;
   float zI = 0;
+
+  float spacing = 2.0f;
+  float scale = 2.0f;
   for (int x = start; x < end; x++) {
     for (int y = start; y < end; y++) {
       for (int z = start; z < end; z++) {
         insertCube(glm::vec3(
-          static_cast<float>(x) * 8.0f,
-          static_cast<float>(y) * 8.0f,
-          static_cast<float>(z) * 8.0f),
+          static_cast<float>(x) * spacing,
+          static_cast<float>(y) * spacing,
+          static_cast<float>(z) * spacing),
           glm::vec3(
             xI/steps,
             yI/steps,
             zI/steps
           ), 
-          glm::vec3(1.8f, 1.8f, 1.8f), vertices
+          glm::vec3(scale), vertices
         );
         //print("xI : " << (xI/steps) << "yI : " << (yI/steps) << "zI : " << (zI/steps))
         zI++;
@@ -376,8 +380,6 @@ int main() {
   print(vertices.size())
   GFVL::VERTEX_BUFFER vertexBuffer(device, vertices.size() * sizeof(vertice), vertices.data());
 
-  // melica.uwu
-  // dino_potato__  
   VkSemaphore imageAvailable; // can i render?
   VkSemaphore renderFinished; // am i done rendering my stuff?
 
@@ -408,9 +410,7 @@ int main() {
     uint64_t current_time = SDL_GetPerformanceCounter();
     delta_time = (double)(current_time - last_time) / (double)SDL_GetPerformanceFrequency();
     last_time = current_time;
-    if (delta_time > 0.01) // jic lag
-      delta_time = 0.1;
-
+    
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
@@ -472,7 +472,6 @@ int main() {
     if (keyboard[SDL_SCANCODE_D]) {
       position += right * speed * delta_time;
     }
-
     glm::mat4 proj = glm::perspectiveRH_ZO(
         glm::radians(90.0f),
         aspect,
