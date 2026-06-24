@@ -152,8 +152,7 @@ void SWAPCHAIN::recreateSwapchain(SDL_Window *window, VkSurfaceKHR surface) {
   VkColorSpaceKHR colorSpace = formats[0].colorSpace;
 
   for (const auto &surfaceFormat : formats) {
-    if (surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
-        surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+    if (surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB && surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
       format = surfaceFormat.format;
       colorSpace = surfaceFormat.colorSpace;
       break;

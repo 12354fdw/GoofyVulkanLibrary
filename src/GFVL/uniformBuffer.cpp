@@ -1,123 +1,79 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
+#include <cassert>
 #include <cstring>
 #include <vulkan/vulkan.h>
-
+#include <iostream>
 #include "GFVL.hpp"
 using namespace GFVL;
 
 // USER-DEFINED STUFF
 namespace GFVL {
-UNIFORM_BUFFER::UNIFORM_BUFFER(DEVICE &device, size_t uboSize, void *ubo) : device(device), size(uboSize) {
-  VkBufferCreateInfo uniformBufferInfo{
-      .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-      .size = uboSize,
-      .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-      .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
-  CheckVkResult(vkCreateBuffer(device.logicalDevice, &uniformBufferInfo, nullptr, &this->uniformBuffer));
+BINDING::BINDING(DEVICE &device, size_t size, void *ubo, uint32_t binding) : device(device), size(size) {
+  VkBufferCreateInfo createInfo{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = size, .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
+  CheckVkResult(vkCreateBuffer(device.logicalDevice, &createInfo, nullptr, &this->buffer));
 
-  VkMemoryRequirements memRequirements;
-  vkGetBufferMemoryRequirements(device.logicalDevice, this->uniformBuffer, &memRequirements);
+  VkMemoryRequirements requirements;
+  vkGetBufferMemoryRequirements(device.logicalDevice, this->buffer, &requirements);
 
-  VkMemoryAllocateInfo uniformBufferMemoryAllocatonInfo{
-      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-      .allocationSize = memRequirements.size,
-      .memoryTypeIndex = GFVL::findMemoryType(device.physicalDevice, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
-  };
-  CheckVkResult(vkAllocateMemory(device.logicalDevice, &uniformBufferMemoryAllocatonInfo, nullptr, &this->uniformBufferMemory));
-  CheckVkResult(vkBindBufferMemory(device.logicalDevice, this->uniformBuffer, this->uniformBufferMemory, 0));
+  VkMemoryAllocateInfo allocation{.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .allocationSize = requirements.size, .memoryTypeIndex = findMemoryType(device.physicalDevice, requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
+  CheckVkResult(vkAllocateMemory(device.logicalDevice, &allocation, nullptr, &this->memory));
 
-  VkDescriptorSetLayoutBinding binding{
-      .binding = 0,
-      .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-      .descriptorCount = 1,
-      .stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS};
+  CheckVkResult(vkBindBufferMemory(device.logicalDevice, this->buffer, this->memory, 0));
 
-  VkDescriptorSetLayoutCreateInfo descriptorInfo{
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-      .bindingCount = 1,
-      .pBindings = &binding};
+  this->layout = {.binding = binding, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS};
 
-  CheckVkResult(vkCreateDescriptorSetLayout(device.logicalDevice, &descriptorInfo, nullptr, &this->descriptorSetLayout));
+  this->bufferInfo = {.buffer = this->buffer, .offset = 0, .range = size};
 
-  vkMapMemory(device.logicalDevice, this->uniformBufferMemory, 0, uboSize, 0, &this->data);
+  vkMapMemory(device.logicalDevice, this->memory, 0, size, 0, &this->data);
 
-  memcpy(this->data, ubo, uboSize);
+  memcpy(this->data, ubo, size);
+}
+void BINDING::update(void *ubo) {
+  memcpy(this->data, ubo, this->size);
+}
+BINDING::~BINDING() {
+  vkUnmapMemory(device.logicalDevice, this->memory);
+  vkDestroyBuffer(device.logicalDevice, this->buffer, nullptr);
+  vkFreeMemory(device.logicalDevice, this->memory, nullptr);
+}
+UNIFORM_BUFFER::UNIFORM_BUFFER(DEVICE &device) : device(device) {
+  bindings.reserve(8);
+}
+BINDING &UNIFORM_BUFFER::emplaceBinding(size_t size, void *ubo) {
+  bindings.emplace_back(device, size, ubo, static_cast<uint32_t>(bindings.size()));
+  return bindings.back();
+}
+void UNIFORM_BUFFER::create() {
+  std::vector<VkDescriptorSetLayoutBinding> layouts;
 
-  vkUnmapMemory(
-      device.logicalDevice,
-      this->uniformBufferMemory);
+  for (auto &binding : bindings)
+    layouts.push_back(binding.layout);
 
-  VkDescriptorPoolSize poolSize{
-      .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-      .descriptorCount = 1};
+  VkDescriptorSetLayoutCreateInfo layoutInfo{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, .bindingCount = static_cast<uint32_t>(layouts.size()), .pBindings = layouts.data()};
+  CheckVkResult(vkCreateDescriptorSetLayout(device.logicalDevice, &layoutInfo, nullptr, &descriptorSetLayout));
 
-  VkDescriptorPoolCreateInfo poolInfo{
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-      .maxSets = 1,
-      .poolSizeCount = 1,
-      .pPoolSizes = &poolSize};
+  VkDescriptorPoolSize poolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = static_cast<uint32_t>(bindings.size())};
+  VkDescriptorPoolCreateInfo poolInfo{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, .maxSets = 1, .poolSizeCount = 1, .pPoolSizes = &poolSize};
 
-  CheckVkResult(vkCreateDescriptorPool(
-      device.logicalDevice,
-      &poolInfo,
-      nullptr,
-      &this->descriptorPool));
+  CheckVkResult(vkCreateDescriptorPool(device.logicalDevice, &poolInfo, nullptr, &descriptorPool));
 
-  VkDescriptorSetAllocateInfo descriptorSetAllocationInfo{
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-      .descriptorPool = this->descriptorPool,
-      .descriptorSetCount = 1,
-      .pSetLayouts = &this->descriptorSetLayout};
+  VkDescriptorSetAllocateInfo allocation{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, .descriptorPool = descriptorPool, .descriptorSetCount = 1, .pSetLayouts = &descriptorSetLayout};
 
-  CheckVkResult(vkAllocateDescriptorSets(
-      device.logicalDevice,
-      &descriptorSetAllocationInfo,
-      &this->descriptorSet));
+  CheckVkResult(vkAllocateDescriptorSets(device.logicalDevice, &allocation, &descriptorSet));
 
-  VkDescriptorBufferInfo descriptorBufferInfo{
-      .buffer = this->uniformBuffer,
-      .offset = 0,
-      .range = uboSize};
+  std::vector<VkWriteDescriptorSet> writes;
+  for (auto &binding : bindings) {
+    writes.push_back({.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = descriptorSet, .dstBinding = binding.layout.binding, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .pBufferInfo = &binding.bufferInfo});
+  }
 
-  VkWriteDescriptorSet descriptorWrite{
-      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet = this->descriptorSet,
-      .dstBinding = 0,
-      .dstArrayElement = 0,
-      .descriptorCount = 1,
-      .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-      .pBufferInfo = &descriptorBufferInfo};
-
-  vkUpdateDescriptorSets(
-      device.logicalDevice,
-      1,
-      &descriptorWrite,
-      0,
-      nullptr);
+  vkUpdateDescriptorSets(device.logicalDevice, writes.size(), writes.data(), 0, nullptr);
 }
 void UNIFORM_BUFFER::bind(VkCommandBuffer &commandBuffer, PIPELINE &pipeline, uint32_t set) {
-  vkCmdBindDescriptorSets(
-      commandBuffer,
-      VK_PIPELINE_BIND_POINT_GRAPHICS,
-      pipeline.pipelineLayout,
-      set,
-      1,
-      &descriptorSet,
-      0,
-      nullptr);
-}
-void UNIFORM_BUFFER::update(void *data) {
-  void *mapped;
-  vkMapMemory(device.logicalDevice, uniformBufferMemory, 0, size, 0, &mapped);
-  memcpy(mapped, data, size);
-  vkUnmapMemory(device.logicalDevice, uniformBufferMemory);
+  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, set, 1, &descriptorSet, 0, nullptr);
 }
 UNIFORM_BUFFER::~UNIFORM_BUFFER() {
-  vkDestroyBuffer(device.logicalDevice, this->uniformBuffer, nullptr);
-  vkFreeMemory(device.logicalDevice, this->uniformBufferMemory, nullptr);
-vkDestroyDescriptorSetLayout(device.logicalDevice, this->descriptorSetLayout, nullptr);
-
-  vkDestroyDescriptorPool(device.logicalDevice, this->descriptorPool, nullptr);
+  vkDestroyDescriptorSetLayout(device.logicalDevice, descriptorSetLayout, nullptr);
+  vkDestroyDescriptorPool(device.logicalDevice, descriptorPool, nullptr);
 }
 } // namespace GFVL

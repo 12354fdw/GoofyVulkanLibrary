@@ -211,16 +211,22 @@ int main() {
   layout.addAttribute(VK_FORMAT_R32G32B32_SFLOAT, offsetof(vertice, normal));
   layout.addAttribute(VK_FORMAT_R32G32B32_SFLOAT, offsetof(vertice, color));
 
+  GFVL::UNIFORM_BUFFER uniformBuffer(device);
   CameraUBO camera{};
-  GFVL::UNIFORM_BUFFER cameraUBO(device, sizeof(CameraUBO), &camera);
+  GFVL::BINDING& cameraBinding = uniformBuffer.emplaceBinding(sizeof(CameraUBO), &camera);
 
-  //LightingUBO lighting{.lightPos = glm::vec3(0.0f), .lightColor = glm::vec3(1.0f)};
-  //GFVL::UNIFORM_BUFFER lightingUBO(device, sizeof(LightingUBO), &lighting);
+  LightingUBO lighting{.lightPos = glm::vec3(0.0f), .lightColor = glm::vec3(1.0f)};
+  GFVL::BINDING& lightingBinding = uniformBuffer.emplaceBinding(sizeof(LightingUBO), &lighting); 
 
-  GFVL::PIPELINE pipeline(device, swapchain, layout, shaderStages, renderPass, GFVL::collectLayouts({&cameraUBO}));
+  uniformBuffer.create();
+  std::vector<VkDescriptorSetLayout> layouts = {uniformBuffer.descriptorSetLayout};
+  std::cout << "UBO descriptor layout: " << uniformBuffer.descriptorSetLayout << "\n";
+  std::cout << "layouts count: " << layouts.size() << "\n";
+  std::cout << "layout[0]: " << layouts[0] << "\n";
+  GFVL::PIPELINE pipeline(device, swapchain, layout, shaderStages, renderPass, layouts); 
   GFVL::FRAMEBUFFER framebuffers(device, swapchain, renderPass);
 
-  GFVL::COMMAND_POOL commandPool(device, framebuffers);
+  GFVL::COMMAND_POOL commandPool(device , framebuffers);
 
   std::vector<vertice> vertices;
   int start = -35;
@@ -273,6 +279,7 @@ int main() {
   CheckVkResult(vkCreateFence(device.logicalDevice, &fenceInfo, nullptr, &inFlightFence));
 
   bool running = true;
+  bool menu = false;
   bool framebufferResized = false;
   float speed = 1.0f;
 
@@ -316,6 +323,14 @@ int main() {
 
         angle = glm::normalize(qYaw * qPitch);
       }
+      if (event.type == SDL_EVENT_KEY_DOWN) {
+        if (event.key.repeat == 0) {
+          if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
+            menu = !menu;
+            SDL_SetWindowRelativeMouseMode(window, menu);
+          }
+        }
+      }
     }
 
     if (framebufferResized) {
@@ -342,6 +357,11 @@ int main() {
       position += forward * speed * delta_time;
     }
 
+    if (keyboard[SDL_SCANCODE_SPACE]) {
+      lighting.lightPos = position;
+      lightingBinding.update(&lighting);
+    }
+
     if (keyboard[SDL_SCANCODE_S]) {
       position -= forward * speed * delta_time;
     }
@@ -352,6 +372,7 @@ int main() {
     if (keyboard[SDL_SCANCODE_D]) {
       position += right * speed * delta_time;
     }
+
     glm::mat4 proj = glm::perspectiveRH_ZO(
         glm::radians(90.0f),
         aspect,
@@ -395,10 +416,9 @@ int main() {
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
-
-    cameraUBO.bind(commandBuffer, pipeline, 0);
-    //lightingUBO.bind(commandBuffer, pipeline, 1);
-    cameraUBO.update(&camera);
+    
+    cameraBinding.update(&camera);
+    uniformBuffer.bind(commandBuffer, pipeline, 0);
     setViewport(commandBuffer, swapchain);
     VkDeviceSize offsets[] = {0};
 

@@ -9,6 +9,7 @@
 
 #define DEBUG_PRINT(message) std::cout << "[GFVL] " << message << "\n";
 #define ERROR(message) throw std::runtime_error(message);
+
 namespace GFVL {
 const bool DEBUG_MODE = true;
 class PIPELINE;
@@ -112,29 +113,42 @@ private:
   DEVICE &device;
 };
 
+class BINDING {
+public:
+  DEVICE &device;
+  VkBuffer buffer{};
+  VkDeviceMemory memory{};
+  VkDescriptorSet descriptorSet{};
+  VkDescriptorSetLayoutBinding layout{};
+  VkDescriptorBufferInfo bufferInfo{};
+  void *data{};
+  size_t size{};
+
+  BINDING(DEVICE &device, size_t size, void *ubo, uint32_t binding);
+  void update(void *ubo);
+  ~BINDING();
+};
+
 class UNIFORM_BUFFER {
 public:
-  VkDescriptorSetLayout descriptorSetLayout;
-  VkDeviceMemory uniformBufferMemory;
-  VkDescriptorSet descriptorSet;
-  void *data;
+  DEVICE &device;
+  std::vector<BINDING> bindings;
+  VkDescriptorSetLayout descriptorSetLayout{};
+  VkDescriptorPool descriptorPool{};
+  VkDescriptorSet descriptorSet{};
 
-  void update(void *data);
-  void bind(VkCommandBuffer &commandBuffer, PIPELINE &pipeline, uint32_t set);
-  UNIFORM_BUFFER(DEVICE &device, size_t uboSize, void *ubo);
+  UNIFORM_BUFFER(DEVICE &device);
   ~UNIFORM_BUFFER();
+
+  BINDING& emplaceBinding(size_t size, void *ubo);
+  void create();
+  void bind(VkCommandBuffer &commandBuffer, PIPELINE &pipeline, uint32_t set);
 
   UNIFORM_BUFFER(const UNIFORM_BUFFER &) = delete;
   UNIFORM_BUFFER &operator=(const UNIFORM_BUFFER &) = delete;
 
   UNIFORM_BUFFER(const UNIFORM_BUFFER &&) = delete;
   UNIFORM_BUFFER &operator=(const UNIFORM_BUFFER &&) = delete;
-
-private:
-  DEVICE &device;
-  VkBuffer uniformBuffer;
-  uint32_t size;
-  VkDescriptorPool descriptorPool;
 };
 
 class PIPELINE {
@@ -233,7 +247,7 @@ const char *VkResultToString(VkResult result);
 void PrintVkResult(VkResult result);
 VkResult CheckVkResult(VkResult result);
 uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties);
-std::vector<VkDescriptorSetLayout> collectLayouts(const std::vector<UNIFORM_BUFFER *> &buffers);
+
 } // namespace GFVL
 
 #endif

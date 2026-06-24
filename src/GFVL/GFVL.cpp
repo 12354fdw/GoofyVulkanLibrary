@@ -114,13 +114,4 @@ namespace GFVL {
     ERROR("failed to find memory type")
   }
 
-  std::vector<VkDescriptorSetLayout> collectLayouts(const std::vector<UNIFORM_BUFFER *> &buffers) {
-    std::vector<VkDescriptorSetLayout> layouts;
-
-    for (auto *buffer : buffers) {
-      layouts.push_back(buffer->descriptorSetLayout);
-      std::cout << "pushed backS \n";
-    }
-    return layouts;
-  }
 }

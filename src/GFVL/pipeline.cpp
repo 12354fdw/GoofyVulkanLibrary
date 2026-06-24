@@ -1,5 +1,6 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -34,8 +35,8 @@ PIPELINE::PIPELINE(DEVICE &device, SWAPCHAIN &swapchain, VERTEX_LAYOUT &layout, 
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
       .setLayoutCount = static_cast<uint32_t>(layouts.size()),
       .pSetLayouts = layouts.data()};
-      
-  vkCreatePipelineLayout(device.logicalDevice, &info, nullptr, &this->pipelineLayout);
+
+      CheckVkResult(vkCreatePipelineLayout(device.logicalDevice, &info, nullptr, &this->pipelineLayout));
 
   // vertex input
   VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
@@ -66,7 +67,9 @@ PIPELINE::PIPELINE(DEVICE &device, SWAPCHAIN &swapchain, VERTEX_LAYOUT &layout, 
       .polygonMode = VK_POLYGON_MODE_FILL,
       .cullMode = VK_CULL_MODE_NONE, // VK_CULL_MODE_BACK_BIT
       .frontFace = VK_FRONT_FACE_CLOCKWISE,
-      .depthBiasEnable = VK_FALSE};
+      .depthBiasEnable = VK_FALSE,
+      .lineWidth = 1.0f
+  };
 
   // multisampling
   // me
