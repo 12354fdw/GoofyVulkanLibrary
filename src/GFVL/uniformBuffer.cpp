@@ -3,7 +3,6 @@
 #include <cassert>
 #include <cstring>
 #include <vulkan/vulkan.h>
-#include <iostream>
 #include "GFVL.hpp"
 using namespace GFVL;
 

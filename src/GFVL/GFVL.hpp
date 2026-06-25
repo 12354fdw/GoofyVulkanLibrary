@@ -232,13 +232,17 @@ private:
 };
 
 class MESH {
+public:
   size_t vertice_size;
   uint32_t vertice_count;
   size_t mesh_size;
-  void *data;
 
-  MESH(size_t vertice_size, uint32_t vertice_count);
+  MESH(void* data, uint32_t size, DEVICE& device);
   ~MESH();
+
+private:
+  VERTEX_BUFFER vertexBuffer;
+  DEVICE& device;
 };
 VkInstance InitializeVkInstance(VkApplicationInfo *appInfo);
 // defined in GFVL.cpp

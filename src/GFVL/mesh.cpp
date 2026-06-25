@@ -8,11 +8,10 @@ using namespace GFVL;
 
 // USER-DEFINED STUFF
 namespace GFVL {
-MESH::MESH(size_t vertice_size, uint32_t vertice_count) : vertice_size(vertice_size), vertice_count(vertice_count) {
-  this->data = malloc(vertice_count * vertice_size);
-  this->mesh_size = vertice_count * vertice_size;
+MESH::MESH(void *data, uint32_t size, DEVICE &device) : device(device), vertexBuffer(device, size, data) {
+  this->mesh_size = size;
 }
 MESH::~MESH() {
-    free(this->data);
+
 }
 }

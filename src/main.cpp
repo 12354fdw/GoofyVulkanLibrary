@@ -232,6 +232,7 @@ int main() {
   int start = -35;
   int end = 35;
   int steps = end - start;
+  int cubes = steps*steps*steps;
 
   float xI = 0;
   float yI = 0;
