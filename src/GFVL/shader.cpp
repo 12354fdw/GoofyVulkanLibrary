@@ -32,7 +32,7 @@ SHADER::SHADER(DEVICE &device, VkShaderStageFlagBits stage, const char *filename
     CheckVkResult(vkCreateShaderModule(device.logicalDevice, &shaderCreationInfo, nullptr, &this->shaderModule));
 }
 SHADER::SHADER(SHADER &&other) noexcept : device(other.device), shaderModule(other.shaderModule), stage(other.stage) {
-  other.shaderModule = VK_NULL_HANDLE;
+  other.shaderModule = VK_NULL_HANDLE; // this just prevents the vulkan shader module from being destroyed
 }
 SHADER::~SHADER() {
   if (shaderModule != VK_NULL_HANDLE) {
