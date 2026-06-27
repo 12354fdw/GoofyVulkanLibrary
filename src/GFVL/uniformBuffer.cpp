@@ -10,6 +10,7 @@ using namespace GFVL;
 // USER-DEFINED STUFF
 namespace GFVL {
 BINDING::BINDING(DEVICE &device, size_t size, void *ubo, uint32_t binding) : device(device), size(size) {
+  DEBUG_PRINT("Creating binding at binding " << binding)
   VkBufferCreateInfo createInfo{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = size, .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
   CheckVkResult(vkCreateBuffer(device.logicalDevice, &createInfo, nullptr, &this->buffer));
 
@@ -33,19 +34,21 @@ void BINDING::update(void *ubo) {
   memcpy(this->data, ubo, this->size);
 }
 BINDING::~BINDING() {
+  DEBUG_PRINT("Binding " << this->layout.binding << " was destroyed")
   vkUnmapMemory(device.logicalDevice, this->memory);
   vkDestroyBuffer(device.logicalDevice, this->buffer, nullptr);
   vkFreeMemory(device.logicalDevice, this->memory, nullptr);
 }
-UNIFORM_BUFFER::UNIFORM_BUFFER(DEVICE &device) : device(device) {
-  bindings.reserve(16);
-}
-BINDING &UNIFORM_BUFFER::emplaceBinding(size_t size, void *ubo) {
-  if (bindings.size() == 16) 
-    ERROR("You cannot have more than 16 bindings!");
-
-  bindings.emplace_back(device, size, ubo, static_cast<uint32_t>(bindings.size()));
-  return bindings.back();
+UNIFORM_BUFFER::UNIFORM_BUFFER(DEVICE &device, std::vector<UNIFORM_BUFFER_BINDING>& bindings) : device(device) {
+  this->bindings.reserve(16);
+  uint32_t currentBinding = 0;
+  for (UNIFORM_BUFFER_BINDING &binding : bindings) {
+    if (bindings.size() == 16)
+      ERROR("You cannot have more than 16 bindings!");
+    this->bindings.emplace_back(device, binding.size, binding.ubo, currentBinding);
+    currentBinding++;
+  }
+  this->create();
 }
 
 void UNIFORM_BUFFER::create() {
@@ -72,6 +75,7 @@ void UNIFORM_BUFFER::create() {
   }
 
   vkUpdateDescriptorSets(device.logicalDevice, writes.size(), writes.data(), 0, nullptr);
+  DEBUG_PRINT("Succesfully created uniform buffers")
 }
 void UNIFORM_BUFFER::bind(VkCommandBuffer &commandBuffer, PIPELINE &pipeline, uint32_t set) {
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, set, 1, &descriptorSet, 0, nullptr);

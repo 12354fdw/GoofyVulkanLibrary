@@ -13,23 +13,24 @@ using namespace GFVL;
 // USER-DEFINED STUFF
 namespace GFVL {
 SHADER::SHADER(DEVICE &device, VkShaderStageFlagBits stage, const char *filename) : device(device) {
-    this->stage = stage;
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+  this->stage = stage;
+  std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
-    if (!file.is_open())
-        ERROR("failed to open file!");
+  if (!file.is_open())
+      ERROR("failed to open file!");
 
-    size_t fileSize = (size_t)file.tellg();
-    std::vector<char> buffer(fileSize);
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-    file.close();
+  size_t fileSize = (size_t)file.tellg();
+  std::vector<char> buffer(fileSize);
+  file.seekg(0);
+  file.read(buffer.data(), fileSize);
+  file.close();
 
-    VkShaderModuleCreateInfo shaderCreationInfo{
-        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .codeSize = buffer.size(),
-        .pCode = reinterpret_cast<const uint32_t *>(buffer.data())};
-    CheckVkResult(vkCreateShaderModule(device.logicalDevice, &shaderCreationInfo, nullptr, &this->shaderModule));
+  VkShaderModuleCreateInfo shaderCreationInfo{
+      .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+      .codeSize = buffer.size(),
+      .pCode = reinterpret_cast<const uint32_t *>(buffer.data())};
+  CheckVkResult(vkCreateShaderModule(device.logicalDevice, &shaderCreationInfo, nullptr, &this->shaderModule));
+  DEBUG_PRINT("succesfully created shader!")
 }
 SHADER::SHADER(SHADER &&other) noexcept : device(other.device), shaderModule(other.shaderModule), stage(other.stage) {
   other.shaderModule = VK_NULL_HANDLE; // this just prevents the vulkan shader module from being destroyed

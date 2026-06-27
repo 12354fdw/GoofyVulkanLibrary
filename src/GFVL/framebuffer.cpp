@@ -2,6 +2,7 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 #include <stdexcept>
+#include <iostream>
 #include "GFVL.hpp"
 
 using namespace GFVL;
@@ -63,6 +64,7 @@ void createImage(
 
   CheckVkResult(vkAllocateMemory(device, &allocInfo, nullptr, &memory));
   vkBindImageMemory(device, image, memory, 0);
+  DEBUG_PRINT("succesfully created image!")
 }
 
 VkImageView createImageView(

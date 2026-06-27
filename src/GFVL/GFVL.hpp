@@ -9,6 +9,7 @@
 
 #define DEBUG_PRINT(message) std::cout << "[GFVL] " << message << "\n";
 #define ERROR(message) throw std::runtime_error(message);
+#define GOOFYVLIB_ITERATION 1 // internal application name
 
 namespace GFVL {
 const bool DEBUG_MODE = true;
@@ -18,6 +19,28 @@ enum PREFERRED_GPU {
   PREFERRED_GPU_PERFORMANCE,
 };
 
+enum VERTEX_BUFFER_TYPE {
+  VERTEX_BUFFER_TYPE_CPU_READABLE,
+  VERTEX_BUFFER_TYPE_STATIC
+};
+
+struct APPLICATION_INFO {
+  const char *applicationName;
+  uint32_t applicationVersion;
+  int width;
+  int height;
+  PREFERRED_GPU preferredGPU;
+};
+
+struct UNIFORM_BUFFER_BINDING {
+  size_t size;
+  void* ubo;
+};
+
+struct SHADER_STAGE {
+  VkShaderStageFlagBits flags;
+  const char *filename;
+};
 class VERTEX_LAYOUT {
 public:
   VkVertexInputBindingDescription binding;
@@ -137,7 +160,7 @@ public:
   VkDescriptorPool descriptorPool{};
   VkDescriptorSet descriptorSet{};
 
-  UNIFORM_BUFFER(DEVICE &device);
+  UNIFORM_BUFFER(DEVICE &device, std::vector<UNIFORM_BUFFER_BINDING> &bindings);
   ~UNIFORM_BUFFER();
 
   BINDING& emplaceBinding(size_t size, void *ubo);
@@ -215,7 +238,9 @@ public:
   VkBuffer vertexBuffer;
   VkDeviceMemory vertexBufferMemory;
   VkDeviceSize size;
-
+  void *data;
+  VERTEX_BUFFER_TYPE type;
+  
   VERTEX_BUFFER(DEVICE &device, VkDeviceSize size, void *inputData);
   ~VERTEX_BUFFER();
 
@@ -228,7 +253,6 @@ public:
 private:
   DEVICE &device;
   VkBufferCreateInfo bufferInfo;
-  void *data;
 };
 
 class MESH {
@@ -236,15 +260,39 @@ public:
   size_t vertice_size;
   uint32_t vertice_count;
   size_t mesh_size;
+  VERTEX_BUFFER vertexBuffer;
 
   MESH(void* data, uint32_t size, DEVICE& device);
   ~MESH();
 
 private:
-  VERTEX_BUFFER vertexBuffer;
   DEVICE& device;
 };
-VkInstance InitializeVkInstance(VkApplicationInfo *appInfo);
+
+class INSTANCE {
+public:
+  VkInstance instance;
+  SDL_Window* window;
+  VkSurfaceKHR surface;
+  DEVICE device;
+  SWAPCHAIN swapchain;
+  RENDERPASS renderPass;
+  UNIFORM_BUFFER uniformBuffer;
+  std::vector<SHADER> shaderStages;
+  PIPELINE pipeline;
+  FRAMEBUFFER framebuffer;
+  COMMAND_POOL commandPool;
+
+  INSTANCE(APPLICATION_INFO applicationInfo, VERTEX_LAYOUT &layout, std::vector<UNIFORM_BUFFER_BINDING> &bindings, std::vector<SHADER_STAGE> &stages);
+  ~INSTANCE();
+
+  INSTANCE(const INSTANCE &) = delete;
+  INSTANCE &operator=(const INSTANCE &) = delete;
+
+  INSTANCE(const INSTANCE &&) = delete;
+  INSTANCE &operator=(const INSTANCE &&) = delete;
+};
+
 // defined in GFVL.cpp
 std::vector<char> readFile(const std::string &filename);
 const char *VkResultToString(VkResult result);

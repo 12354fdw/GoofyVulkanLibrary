@@ -62,40 +62,6 @@ namespace GFVL {
     return result;
   }
 
-  VkInstance InitializeVkInstance(VkApplicationInfo *appInfo) {
-    uint32_t instanceExtensionCount = 0;
-    const char *const *instanceExtensions = SDL_Vulkan_GetInstanceExtensions(&instanceExtensionCount);
-
-    if (DEBUG_MODE) { // optionally print the info
-      std::cout << "[GFVL] GFVL_InitializeVkInstance \n";
-      if (instanceExtensions == NULL)
-        std::cout << "[GFVL] No instance extensions supported.. What?" << "\n";
-      std::cout << "[GFVL] Detected instance extensions :\n";
-      for (uint32_t i = 0; i < instanceExtensionCount; i++)
-        std::cout << "  " << instanceExtensions[i] << '\n';
-    }
-    const char *validationLayer = "VK_LAYER_KHRONOS_validation";
-
-    VkInstanceCreateInfo instanceCreationInfo = {
-        .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0,
-        .pApplicationInfo = appInfo,
-        .enabledLayerCount = 1,
-        .ppEnabledLayerNames = &validationLayer,
-        .enabledExtensionCount = instanceExtensionCount,
-        .ppEnabledExtensionNames = instanceExtensions,
-    };
-
-    VkInstance instance;
-    GFVL::CheckVkResult(vkCreateInstance(
-        &instanceCreationInfo,
-        NULL,
-        &instance));
-
-    return instance;
-  }
-
   uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memProperties;
 

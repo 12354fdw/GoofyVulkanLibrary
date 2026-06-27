@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>
+#include <iostream>
 #include <vector>
 #include <vulkan/vulkan.h>
 
@@ -11,47 +12,61 @@
 using namespace GFVL;
 
 namespace GFVL {
-SWAPCHAIN::SWAPCHAIN(DEVICE& device, SDL_Window *window, VkSurfaceKHR surface) : device(device) {
+void pickFormat(DEVICE &device, VkSurfaceKHR surface, VkFormat& format, VkColorSpaceKHR& colorSpace) {
+  std::vector<VkSurfaceFormatKHR> formats;
+  uint32_t count = 0;
+  CheckVkResult(vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice, surface, &count, nullptr));
+  formats.resize(count);
+  CheckVkResult(vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice, surface, &count, formats.data()));
+  if (formats.empty())
+    ERROR("No VKFormats found.. What??")
+
+  // pick random format at first
+
+  format = formats[0].format;
+  colorSpace = formats[0].colorSpace;
+
+  // try to get ideal format
+  for (const VkSurfaceFormatKHR &surfaceFormat : formats) {
+    if (surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB && surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+      DEBUG_PRINT("Found ideal format!")
+      format = surfaceFormat.format;
+      colorSpace = surfaceFormat.colorSpace;
+      break;
+    }
+  }
+}
+VkPresentModeKHR pickPresentMode(DEVICE &device, VkSurfaceKHR surface) {
+  uint32_t count = 0;
+
+  std::vector<VkPresentModeKHR> presentModes;
+  vkGetPhysicalDeviceSurfacePresentModesKHR(device.physicalDevice, surface, &count, nullptr);
+  presentModes.resize(count);
+  vkGetPhysicalDeviceSurfacePresentModesKHR(device.physicalDevice, surface, &count, presentModes.data());
+  if (presentModes.empty())
+    ERROR("No VkPresentModeKHR's found.. What??")
+
+  VkPresentModeKHR presentMode;
+  presentMode = presentModes[0];
+  for (const VkPresentModeKHR& mode : presentModes) {
+    if (mode == VK_PRESENT_MODE_FIFO_KHR) {
+      presentMode = VK_PRESENT_MODE_FIFO_KHR;
+    }
+  }
+  return presentMode;
+}
+SWAPCHAIN::SWAPCHAIN(DEVICE& device, SDL_Window *window, VkSurfaceKHR surface) : device(device), presentMode(pickPresentMode(device, surface)) {
     // giggity
-    VkSurfaceCapabilitiesKHR capabilities{};
-    std::vector<VkSurfaceFormatKHR> formats;
-    std::vector<VkPresentModeKHR> presentModes;
-    
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device.physicalDevice, surface, &capabilities);
-
-    uint32_t count = 0;
-
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice, surface, &count, nullptr);
-    formats.resize(count);
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice, surface, &count, formats.data());
-    if (formats.empty())
-      throw std::runtime_error("[GFVL] No surface formats available.");
-
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device.physicalDevice, surface, &count, nullptr);
-    presentModes.resize(count);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device.physicalDevice, surface, &count, presentModes.data());
+    DEBUG_PRINT("Attempting to create swapchain")
 
     VkFormat format;
     VkColorSpaceKHR colorSpace;
-    VkPresentModeKHR presentMode;
+    pickFormat(this->device, surface, format, colorSpace);
+
+    VkSurfaceCapabilitiesKHR capabilities{};
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device.physicalDevice, surface, &capabilities);
+
     VkExtent2D extent;
-
-    // pick random format at first
-    
-    format = formats[0].format;
-    colorSpace = formats[0].colorSpace;
-
-    // try to get ideal format
-    for (const VkSurfaceFormatKHR &surfaceFormat : formats) {
-      if (surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB && surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-        format = surfaceFormat.format;
-        colorSpace = surfaceFormat.colorSpace;
-        break;
-      }
-    }
-
-    presentMode = VK_PRESENT_MODE_FIFO_KHR; // immediate mode for vsync off
-
     if (capabilities.currentExtent.width != UINT32_MAX) {
       extent = capabilities.currentExtent;
     } else {
@@ -85,6 +100,7 @@ SWAPCHAIN::SWAPCHAIN(DEVICE& device, SDL_Window *window, VkSurfaceKHR surface) :
     if (device.graphicsFamilyIndex != device.presentFamilyIndex) {
         info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
     }
+    uint32_t count = 0;
     CheckVkResult(vkCreateSwapchainKHR(this->device.logicalDevice, &info, nullptr, &this->swapchain));
     vkGetSwapchainImagesKHR(this->device.logicalDevice, this->swapchain, &count, nullptr);
 
@@ -115,6 +131,7 @@ SWAPCHAIN::SWAPCHAIN(DEVICE& device, SDL_Window *window, VkSurfaceKHR surface) :
     this->extent = extent;
     this->presentMode = presentMode;
     this->imageCount = count;
+    DEBUG_PRINT("created swapchain")
 }
 void SWAPCHAIN::recreateSwapchain(SDL_Window *window, VkSurfaceKHR surface) {
   vkDeviceWaitIdle(device.logicalDevice);

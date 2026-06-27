@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <vector>
+#include <iostream>
 #include <vulkan/vulkan.h>
 
 #include "GFVL.hpp"
@@ -14,6 +15,7 @@ namespace GFVL {
 PIPELINE::PIPELINE(DEVICE &device, SWAPCHAIN &swapchain, VERTEX_LAYOUT &layout, std::vector<SHADER> &shaderStages, RENDERPASS &renderPass, std::vector<VkDescriptorSetLayout> layouts) : device(device) {
   std::vector<VkPipelineShaderStageCreateInfo> stages(shaderStages.size());
   size_t index = 0;
+  DEBUG_PRINT("Attempting to create pipeline with " << shaderStages.size() << " shader stages and " << layouts.size() << " layouts.")
   for (const SHADER& shader : shaderStages) {
     stages[index] = VkPipelineShaderStageCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -22,6 +24,7 @@ PIPELINE::PIPELINE(DEVICE &device, SWAPCHAIN &swapchain, VERTEX_LAYOUT &layout, 
         .pName = "main"};
     index++;
   }
+  DEBUG_PRINT("Indexed all shader stages!")
   std::vector<VkDynamicState> dynamicStates = {
       VK_DYNAMIC_STATE_VIEWPORT, // add more as needed,do later
       VK_DYNAMIC_STATE_SCISSOR};
@@ -36,8 +39,8 @@ PIPELINE::PIPELINE(DEVICE &device, SWAPCHAIN &swapchain, VERTEX_LAYOUT &layout, 
       .setLayoutCount = static_cast<uint32_t>(layouts.size()),
       .pSetLayouts = layouts.data()};
 
-      CheckVkResult(vkCreatePipelineLayout(device.logicalDevice, &info, nullptr, &this->pipelineLayout));
-
+  CheckVkResult(vkCreatePipelineLayout(device.logicalDevice, &info, nullptr, &this->pipelineLayout));
+  DEBUG_PRINT("Created pipeline layout")
   // vertex input
   VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
@@ -122,6 +125,7 @@ PIPELINE::PIPELINE(DEVICE &device, SWAPCHAIN &swapchain, VERTEX_LAYOUT &layout, 
       .subpass = 0};
 
   CheckVkResult(vkCreateGraphicsPipelines(device.logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &this->pipeline));
+  DEBUG_PRINT("Created graphics pipeline!")
 }
     PIPELINE::~PIPELINE() {
         vkDestroyPipeline(this->device.logicalDevice, this->pipeline, nullptr);
