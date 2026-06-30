@@ -268,16 +268,15 @@ public:
    * @brief Configuration for creating VertexBuffer class.
    */
   struct CreateInfo {
-    size_t size;                    ///< Size of the buffer in bytes.
-    void *data;                     ///< Pointer to your data.
-    Type type;                      ///< Type of data, see definition.
-    VkCommandBuffer *commandBuffer; ///< Optional, used for static meshes.
+    size_t size; ///< Size of the buffer in bytes.
+    void *data;  ///< Pointer to your data.
+    Type type;   ///< Type of data, see definition.
   };
 
-  void *data() const;      ///< Returns the pointer to data, if using HOST_VISIBLE buffer.
-  size_t size() const;     ///< Re  turns size of buffer in bytes.
+  void *data() const;             ///< Returns the pointer to data, if using HOST_VISIBLE buffer.
+  size_t size() const;            ///< Re  turns size of buffer in bytes.
   const VkBuffer &buffer() const; ///< Returns the buffer
-  Type type() const;       ///< Returns type of buffer.
+  Type type() const;              ///< Returns type of buffer.
 
   /**
    * @brief Creates a vertex buffer.
@@ -288,15 +287,16 @@ public:
 
   ~VertexBuffer(); ///< Destroys a vertex buffer and frees associated memory.
 
-  VertexBuffer(const VertexBuffer &) = delete;
-  VertexBuffer &operator=(const VertexBuffer &) = delete;
-  VertexBuffer(const VertexBuffer &&) = delete;
-  VertexBuffer &operator=(const VertexBuffer &&) = delete;
+  VertexBuffer(const VertexBuffer &other) = delete;            ///< Copy constructor, removed as multiple vertex buffers will have the same buffer handles.
+  VertexBuffer &operator=(const VertexBuffer &other) = delete; ///< Copy assignment operator, removed as multiple vertex buffers will have the same buffer handles.
+
+  VertexBuffer(VertexBuffer &&other) noexcept;            ///< Move constructor, allowed but it will unbind vulkan resources of old object.
+  VertexBuffer &operator=(VertexBuffer &&other); ///< Move assignment operator, allowed but it will unbind vulkan resources of old object.
 
 private:
-  DEVICE &device;              ///< Stores the device reference.
+  DEVICE &device_;              ///< Stores the device reference.
   VkBuffer buffer_;            ///< The buffer of the vertex buffer
-  VkDeviceMemory bufferMemory; ///< The actual memory stored.
+  VkDeviceMemory bufferMemory_; ///< The actual memory stored.
 
   void *data_;  ///< A pointer to the data. Used for HOST_VISIBLE memory.
   size_t size_; ///< Size of the memory. Used mainly for debugging.
@@ -315,10 +315,9 @@ public:
    * @brief Configuration for creating Mesh class.
    */
   struct CreateInfo {
-    size_t size;                    ///< Size of the mesh in bytes.
-    void *data;                     ///< Pointer to mesh data.
-    VertexBuffer::Type type;        ///< The memory allocation of this mesh. See documentation for details.
-    VkCommandBuffer *commandBuffer; ///< Command buffer, for static meshes.
+    size_t size;             ///< Size of the mesh in bytes.
+    void *data;              ///< Pointer to mesh data.
+    VertexBuffer::Type type; ///< The memory allocation of this mesh. See documentation for details.
   };
 
   size_t size() const;
@@ -330,6 +329,12 @@ public:
    * @param createinfo The creation information of the vertex buffer.
    */
   Mesh(DEVICE &device, const CreateInfo &createInfo);
+
+  Mesh(const Mesh &other) = delete;                            ///< Copy constructor, removed as multiple vertex buffers will have the same buffer handles.
+  Mesh &operator=(const Mesh &other) = delete;                 ///< Copy assignment operator, removed as multiple vertex buffers will have the same buffer handles.
+
+  Mesh(Mesh &&other) = default;                            ///< Move constructor, allowed but it will unbind vulkan resources of old object.
+  Mesh &operator=(Mesh &&other) = default;                 ///< Move assignment operator, allowed but it will unbind vulkan resources of old object.
 
   ~Mesh(); ///< Destroys mesh and associated info
 

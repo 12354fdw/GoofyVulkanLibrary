@@ -13,7 +13,7 @@ using namespace GFVL;
 
 // USER-DEFINED STUFF
 namespace GFVL {
-VertexBuffer::VertexBuffer(DEVICE &device, const VertexBuffer::CreateInfo &createInfo) : device(device), size_(createInfo.size), type_(createInfo.type) {
+VertexBuffer::VertexBuffer(DEVICE &device, const VertexBuffer::CreateInfo &createInfo) : device_(device), size_(createInfo.size), type_(createInfo.type) {
   if (createInfo.type == VertexBuffer::Type::HostVisible) {
     createBuffer(
         device,
@@ -21,70 +21,48 @@ VertexBuffer::VertexBuffer(DEVICE &device, const VertexBuffer::CreateInfo &creat
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         this->buffer_,
-        this->bufferMemory);
+        this->bufferMemory_);
 
-    vkMapMemory(
+    CheckVkResult(vkMapMemory(
         device.logicalDevice,
-        bufferMemory,
+        bufferMemory_,
         0,
         createInfo.size,
         0,
-        &this->data_);
+        &this->data_));
 
     memcpy(this->data_, createInfo.data, createInfo.size);
 
-    vkUnmapMemory(device.logicalDevice, bufferMemory);
+    vkUnmapMemory(device.logicalDevice, bufferMemory_);
 
   } else if (createInfo.type == VertexBuffer::Type::DeviceOnly) {
 
-    VkBuffer stagingBuffer = VK_NULL_HANDLE;
-    VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
     createBuffer(
         device,
         createInfo.size,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        stagingBuffer,
-        stagingBufferMemory);
+        this->buffer_,
+        this->bufferMemory_);
 
     void *stagingData = nullptr;
-    vkMapMemory(
+    CheckVkResult(vkMapMemory(
         device.logicalDevice,
-        stagingBufferMemory,
+        this->bufferMemory_,
         0,
         createInfo.size,
         0,
-        &stagingData);
+        &stagingData));
     memcpy(stagingData, createInfo.data, createInfo.size);
     vkUnmapMemory(
         device.logicalDevice,
-        stagingBufferMemory);
+        this->bufferMemory_);
 
-    createBuffer(
-        device,
-        createInfo.size,
-        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        this->buffer_,
-        this->bufferMemory);
-
-    VkBufferCopy copyRegion{
-      .srcOffset = 0,
-      .dstOffset = 0,
-      .size = createInfo.size
-    };
-
-    vkCmdCopyBuffer(
-        *createInfo.commandBuffer,
-        stagingBuffer,
-        this->buffer_,
-        1,
-        &copyRegion);
   } else {
     THROW_EXCEPTION("Invalid VERTEX_BUFFER_TYPE!");
   }
 }
-void* VertexBuffer::data() const {
+void *VertexBuffer::data() const {
   ASSERT(this->type_ != VertexBuffer::Type::HostVisible, "Attempted to access vertex buffer without parameter HOST_VISIBLE, current enum is " << enumToString(this->type_));
   return this->data_;
 }
@@ -97,15 +75,46 @@ const VkBuffer &VertexBuffer::buffer() const {
 VertexBuffer::Type VertexBuffer::type() const {
   return this->type_;
 }
-VertexBuffer::~VertexBuffer() {
-  vkDestroyBuffer(
-      this->device.logicalDevice,
-      this->buffer_,
-      nullptr);
+VertexBuffer::VertexBuffer(VertexBuffer &&other) noexcept
+    : device_(other.device_),
+      buffer_(other.buffer_),
+      bufferMemory_(other.bufferMemory_),
+      data_(other.data_),
+      size_(other.size_),
+      type_(other.type_) {
+  other.buffer_ = VK_NULL_HANDLE;
+  other.bufferMemory_ = VK_NULL_HANDLE;
+  other.data_ = nullptr;
+  other.size_ = 0;
+}
+VertexBuffer &VertexBuffer::operator=(VertexBuffer &&other) {
+  ASSERT(this->device_.logicalDevice != other.device_.logicalDevice, "Attempted to copy buffers with different devices")
+  if (this == &other)
+    return *this;
 
-  vkFreeMemory(
-      this->device.logicalDevice,
-      this->bufferMemory,
-      nullptr);
+  if (buffer_ != VK_NULL_HANDLE) {
+    vkDestroyBuffer(device_.logicalDevice, buffer_, nullptr);
+  }
+
+  if (bufferMemory_ != VK_NULL_HANDLE) {
+    vkFreeMemory(device_.logicalDevice, bufferMemory_, nullptr);
+  }
+
+  buffer_ = other.buffer_;
+  bufferMemory_ = other.bufferMemory_;
+  data_ = other.data_;
+  size_ = other.size_;
+  type_ = other.type_;
+
+  other.buffer_ = VK_NULL_HANDLE;
+  other.bufferMemory_ = VK_NULL_HANDLE;
+  other.data_ = nullptr;
+  other.size_ = 0;
+
+  return *this;
+}
+VertexBuffer::~VertexBuffer() {
+  vkDestroyBuffer(this->device_.logicalDevice, this->buffer_, nullptr); 
+  vkFreeMemory(this->device_.logicalDevice, this->bufferMemory_, nullptr);
 }
 } // namespace GFVL

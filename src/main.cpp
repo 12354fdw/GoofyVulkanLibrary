@@ -260,11 +260,13 @@ int main() {
     yI = 0;
     xI++;
   }
+  std::vector<GFVL::Mesh> meshList;
 
-  GFVL::Mesh mesh(
+  meshList.emplace_back(GFVL::Mesh(
     GFVLinstance.device, 
-    GFVL::Mesh::CreateInfo{.size = vertices.size() * sizeof(vertice), .data = vertices.data(), .type = GFVL::VertexBuffer::Type::HostVisible, .commandBuffer = nullptr}
-  );
+    GFVL::Mesh::CreateInfo{.size = vertices.size() * sizeof(vertice), .data = vertices.data(), .type = GFVL::VertexBuffer::Type::DeviceOnly}
+  ));
+
   VkSemaphore imageAvailable; // can i render?
   VkSemaphore renderFinished; // am i done rendering my stuff?
 
@@ -390,6 +392,34 @@ int main() {
     VkClearValue clearValues[2]{};
     clearValues[0].color = {{0.05f, 0.05f, 0.05f, 1.0f}};
     clearValues[1].depthStencil = {1.0f, 0};
+    
+
+    std::vector<VkBuffer> giggityBuffer(meshList.size());
+    std::vector<VkDeviceMemory> giggityBufferMemory(meshList.size());
+    uint32_t giggityIndex = 0;
+    for (const GFVL::Mesh &mesh : meshList) {
+      GFVL::createBuffer(
+          GFVLinstance.device,
+          mesh.size(),
+          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+          giggityBuffer[giggityIndex],
+          giggityBufferMemory[giggityIndex]);
+
+      VkBufferCopy copyRegion{
+          .srcOffset = 0,
+          .dstOffset = 0,
+          .size = mesh.size()};
+
+      vkCmdCopyBuffer(
+          commandBuffer,
+          mesh.vertexBuffer().buffer(),
+          giggityBuffer[giggityIndex],
+          1,
+          &copyRegion);
+
+      giggityIndex++;
+    }
 
     VkRenderPassBeginInfo renderPassInfo{
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -410,8 +440,7 @@ int main() {
     setViewport(commandBuffer, GFVLinstance.swapchain);
     VkDeviceSize offsets[] = {0};
 
-
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mesh.vertexBuffer().buffer(), offsets);
+    vkCmdBindVertexBuffers(commandBuffer, 0, giggityBuffer.size(), giggityBuffer.data(), offsets);
 
     vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 
@@ -444,8 +473,19 @@ int main() {
         .swapchainCount = 1,
         .pSwapchains = swapchains,
         .pImageIndices = &imageIndex};
-
+    
     CheckVkResult(vkQueuePresentKHR(GFVLinstance.device.graphicsQueue, &presentInfo));
+
+    vkWaitForFences(
+        GFVLinstance.device.logicalDevice,
+        1,
+        &inFlightFence,
+        VK_TRUE,
+        UINT64_MAX);
+    for (uint32_t i = 0; i < giggityBuffer.size(); i++) {
+      vkDestroyBuffer(GFVLinstance.device.logicalDevice, giggityBuffer[i], nullptr);
+      vkFreeMemory(GFVLinstance.device.logicalDevice, giggityBufferMemory[i], nullptr);
+    } 
   } 
 
   vkDeviceWaitIdle(GFVLinstance.device.logicalDevice);
