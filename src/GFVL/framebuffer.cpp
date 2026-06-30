@@ -13,6 +13,7 @@ using namespace GFVL;
 
 namespace {
 
+  
 VkFormat findDepthFormat(VkPhysicalDevice physicalDevice) {
   std::vector<VkFormat> candidates = {
       VK_FORMAT_D32_SFLOAT,
@@ -96,7 +97,7 @@ VkImageView createImageView(
 
 } // namespace
 
-FRAMEBUFFER::FRAMEBUFFER(DEVICE &device, SWAPCHAIN &swapchain, RENDERPASS &renderPass)
+Framebuffer::Framebuffer(DEVICE &device, SWAPCHAIN &swapchain, RENDERPASS &renderPass)
     : device(device) {
 
   auto findDepthFormat = [&](VkPhysicalDevice phys) -> VkFormat {
@@ -183,7 +184,7 @@ FRAMEBUFFER::FRAMEBUFFER(DEVICE &device, SWAPCHAIN &swapchain, RENDERPASS &rende
   recreate(swapchain, renderPass);
 }
 
-void FRAMEBUFFER::recreate(SWAPCHAIN &swapchain, RENDERPASS &renderPass) {
+void Framebuffer::recreate(SWAPCHAIN &swapchain, RENDERPASS &renderPass) {
   vkDeviceWaitIdle(device.logicalDevice);
 
   for (auto fb : framebuffers)
@@ -272,7 +273,7 @@ void FRAMEBUFFER::recreate(SWAPCHAIN &swapchain, RENDERPASS &renderPass) {
   }
 }
 
-FRAMEBUFFER::~FRAMEBUFFER() {
+Framebuffer::~Framebuffer() {
   vkDeviceWaitIdle(device.logicalDevice);
 
   for (auto fb : framebuffers)

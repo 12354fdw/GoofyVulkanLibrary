@@ -206,19 +206,19 @@ private:
   DEVICE &device;
 };
 
-class FRAMEBUFFER {
+class Framebuffer {
 public:
   std::vector<VkFramebuffer> framebuffers;
 
   void recreate(SWAPCHAIN &swapchain, RENDERPASS &renderPass);
-  FRAMEBUFFER(DEVICE &device, SWAPCHAIN &swapchain, RENDERPASS &renderPass);
-  ~FRAMEBUFFER();
+  Framebuffer(DEVICE &device, SWAPCHAIN &swapchain, RENDERPASS &renderPass);
+  ~Framebuffer();
 
-  FRAMEBUFFER(const FRAMEBUFFER &) = delete;
-  FRAMEBUFFER &operator=(const FRAMEBUFFER &) = delete;
+  Framebuffer(const Framebuffer &) = delete;
+  Framebuffer &operator=(const Framebuffer &) = delete;
 
-  FRAMEBUFFER(const FRAMEBUFFER &&) = delete;
-  FRAMEBUFFER &operator=(const FRAMEBUFFER &&) = delete;
+  Framebuffer(const Framebuffer &&) = delete;
+  Framebuffer &operator=(const Framebuffer &&) = delete;
 
 private:
   DEVICE &device;
@@ -229,19 +229,19 @@ private:
   VkFormat depthFormat{};
 };
 
-class COMMAND_POOL {
+class CommandPool {
 public:
   VkCommandPool commandPool;
   std::vector<VkCommandBuffer> commandBuffers;
 
-  COMMAND_POOL(DEVICE &device, FRAMEBUFFER &framebuffer);
-  ~COMMAND_POOL();
+  CommandPool(DEVICE &device, Framebuffer &framebuffer);
+  ~CommandPool();
 
-  COMMAND_POOL(const COMMAND_POOL &) = delete;
-  COMMAND_POOL &operator=(const COMMAND_POOL &) = delete;
+  CommandPool(const CommandPool &) = delete;
+  CommandPool &operator=(const CommandPool &) = delete;
 
-  COMMAND_POOL(const COMMAND_POOL &&) = delete;
-  COMMAND_POOL &operator=(const COMMAND_POOL &&) = delete;
+  CommandPool(const CommandPool &&) = delete;
+  CommandPool &operator=(const CommandPool &&) = delete;
 
 private:
   DEVICE &device;
@@ -339,7 +339,7 @@ public:
   ~Mesh(); ///< Destroys mesh and associated info
 
 private:
-  DEVICE &device;             ///< Stores the device reference.
+  DEVICE &device_;             ///< Stores the device reference.
   size_t size_;               ///< Size of the mesh in bytes.
   VertexBuffer vertexBuffer_; ///< The buffer containing the actual memory
 };
@@ -355,8 +355,9 @@ public:
   UNIFORM_BUFFER uniformBuffer;
   std::vector<SHADER> shaderStages;
   PIPELINE pipeline;
-  FRAMEBUFFER framebuffer;
-  COMMAND_POOL commandPool;
+  Framebuffer framebuffer;
+  CommandPool commandPool;
+  
 
   INSTANCE(APPLICATION_INFO applicationInfo, VERTEX_LAYOUT &layout, std::vector<UNIFORM_BUFFER_BINDING> &bindings, std::vector<SHADER_STAGE> &stages);
   ~INSTANCE();

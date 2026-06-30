@@ -267,18 +267,21 @@ int main() {
     GFVL::Mesh::CreateInfo{.size = vertices.size() * sizeof(vertice), .data = vertices.data(), .type = GFVL::VertexBuffer::Type::DeviceOnly}
   ));
 
-  VkSemaphore imageAvailable; // can i render?
-  VkSemaphore renderFinished; // am i done rendering my stuff?
+  constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
+  uint32_t currentFrame = 0;
 
-  VkFence inFlightFence;
+  VkSemaphore imageAvailable[MAX_FRAMES_IN_FLIGHT]; // can i render?
+  VkSemaphore renderFinished[MAX_FRAMES_IN_FLIGHT]; // am i done rendering my stuff?
+  VkFence inFlightFence[MAX_FRAMES_IN_FLIGHT];
+
   VkSemaphoreCreateInfo semaphoreInfo{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-
-  CheckVkResult(vkCreateSemaphore(GFVLinstance.device.logicalDevice, &semaphoreInfo, nullptr, &imageAvailable));
-  CheckVkResult(vkCreateSemaphore(GFVLinstance.device.logicalDevice, &semaphoreInfo, nullptr, &renderFinished));
-
   VkFenceCreateInfo fenceInfo{.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT};
-  CheckVkResult(vkCreateFence(GFVLinstance.device.logicalDevice, &fenceInfo, nullptr, &inFlightFence));
 
+  for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    CheckVkResult(vkCreateSemaphore(GFVLinstance.device.logicalDevice, &semaphoreInfo, nullptr, &imageAvailable[i]));
+    CheckVkResult(vkCreateSemaphore(GFVLinstance.device.logicalDevice, &semaphoreInfo, nullptr, &renderFinished[i]));
+    CheckVkResult(vkCreateFence(GFVLinstance.device.logicalDevice, &fenceInfo, nullptr, &inFlightFence[i]));
+  }
   bool running = true;
   bool menu = false;
   bool framebufferResized = false;
@@ -286,7 +289,7 @@ int main() {
 
   float aspect = 0;
   int w, h;
-  SDL_GetWindowSizeInPixels(GFVLinstance.window, &w, &h);
+  SDL_GetWindowSizeInPixels(GFVLinstance.window, &w, &h); 
   aspect = static_cast<float>(w) / static_cast<float>(h);
 
   uint64_t last_time = SDL_GetPerformanceCounter();
@@ -376,11 +379,11 @@ int main() {
     camera.MVP = proj * view;
     camera.viewPos = position;
 
-    vkWaitForFences(GFVLinstance.device.logicalDevice, 1, &inFlightFence, VK_TRUE, UINT64_MAX);
-    vkResetFences(GFVLinstance.device.logicalDevice, 1, &inFlightFence);
+    vkWaitForFences(GFVLinstance.device.logicalDevice, 1, &inFlightFence[currentFrame], VK_TRUE, UINT64_MAX);
+    vkResetFences(GFVLinstance.device.logicalDevice, 1, &inFlightFence[currentFrame]);
 
     uint32_t imageIndex;
-    CheckVkResult(vkAcquireNextImageKHR(GFVLinstance.device.logicalDevice, GFVLinstance.swapchain.swapchain, UINT64_MAX, imageAvailable, VK_NULL_HANDLE, &imageIndex));
+    CheckVkResult(vkAcquireNextImageKHR(GFVLinstance.device.logicalDevice, GFVLinstance.swapchain.swapchain, UINT64_MAX, imageAvailable[currentFrame], VK_NULL_HANDLE, &imageIndex));
 
     VkCommandBuffer commandBuffer = GFVLinstance.commandPool.commandBuffers[imageIndex];
     CheckVkResult(vkResetCommandBuffer(commandBuffer, 0));
@@ -448,9 +451,9 @@ int main() {
 
     CheckVkResult(vkEndCommandBuffer(commandBuffer));
 
-    VkSemaphore waitSemaphores[] = {imageAvailable};
+    VkSemaphore waitSemaphores[] = {imageAvailable[currentFrame]};
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    VkSemaphore signalSemaphores[] = {renderFinished};
+    VkSemaphore signalSemaphores[] = {renderFinished[currentFrame]};
 
     VkSubmitInfo submitInfo{
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -462,7 +465,7 @@ int main() {
         .signalSemaphoreCount = 1,
         .pSignalSemaphores = signalSemaphores};
 
-    CheckVkResult(vkQueueSubmit(GFVLinstance.device.graphicsQueue, 1, &submitInfo, inFlightFence));
+    CheckVkResult(vkQueueSubmit(GFVLinstance.device.graphicsQueue, 1, &submitInfo, inFlightFence[currentFrame]));
 
     VkSwapchainKHR swapchains[] = {GFVLinstance.swapchain.swapchain};
 
@@ -479,23 +482,26 @@ int main() {
     vkWaitForFences(
         GFVLinstance.device.logicalDevice,
         1,
-        &inFlightFence,
+        &inFlightFence[currentFrame],
         VK_TRUE,
         UINT64_MAX);
     for (uint32_t i = 0; i < giggityBuffer.size(); i++) {
       vkDestroyBuffer(GFVLinstance.device.logicalDevice, giggityBuffer[i], nullptr);
       vkFreeMemory(GFVLinstance.device.logicalDevice, giggityBufferMemory[i], nullptr);
-    } 
+    }
+
+    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
   } 
 
   vkDeviceWaitIdle(GFVLinstance.device.logicalDevice);
 
+  for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    vkDestroyFence(GFVLinstance.device.logicalDevice, inFlightFence[i], nullptr);
 
-  vkDestroyFence(GFVLinstance.device.logicalDevice, inFlightFence, nullptr);
+    vkDestroySemaphore(GFVLinstance.device.logicalDevice, renderFinished[i], nullptr);
 
-  vkDestroySemaphore(GFVLinstance.device.logicalDevice, renderFinished, nullptr);
-
-  vkDestroySemaphore(GFVLinstance.device.logicalDevice, imageAvailable, nullptr);
+    vkDestroySemaphore(GFVLinstance.device.logicalDevice, imageAvailable[i], nullptr);
+  }
 
   return 0;
 }

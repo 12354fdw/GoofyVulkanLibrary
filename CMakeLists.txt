@@ -21,7 +21,13 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
 
 message(STATUS "SDL includes = ${SDL_INCLUDES}")
 add_executable(main ${SOURCES})
-
+target_compile_options(main PRIVATE
+    -fno-omit-frame-pointer
+    -g
+)
+target_link_options(main PRIVATE 
+    -g
+)
 target_link_libraries(main PRIVATE
     SDL3::SDL3
     Vulkan::Vulkan

@@ -8,7 +8,7 @@ using namespace GFVL;
 
 // USER-DEFINED STUFF
 namespace GFVL {
-    COMMAND_POOL::COMMAND_POOL(DEVICE& device, FRAMEBUFFER& framebuffer) : device(device) {
+    CommandPool::CommandPool(DEVICE& device, Framebuffer& framebuffer) : device(device) {
       VkCommandPoolCreateInfo poolInfo{
           .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
           .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
@@ -26,7 +26,7 @@ namespace GFVL {
 
       CheckVkResult(vkAllocateCommandBuffers(device.logicalDevice, &allocInfo, this->commandBuffers.data()));
     }
-    COMMAND_POOL::~COMMAND_POOL() {
+    CommandPool::~CommandPool() {
       vkDestroyCommandPool(this->device.logicalDevice, this->commandPool, nullptr);
       
     }

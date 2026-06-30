@@ -36,7 +36,6 @@ VertexBuffer::VertexBuffer(DEVICE &device, const VertexBuffer::CreateInfo &creat
     vkUnmapMemory(device.logicalDevice, bufferMemory_);
 
   } else if (createInfo.type == VertexBuffer::Type::DeviceOnly) {
-
     createBuffer(
         device,
         createInfo.size,
@@ -114,7 +113,7 @@ VertexBuffer &VertexBuffer::operator=(VertexBuffer &&other) {
   return *this;
 }
 VertexBuffer::~VertexBuffer() {
-  vkDestroyBuffer(this->device_.logicalDevice, this->buffer_, nullptr); 
+  vkDestroyBuffer(this->device_.logicalDevice, this->buffer_, nullptr);
   vkFreeMemory(this->device_.logicalDevice, this->bufferMemory_, nullptr);
 }
 } // namespace GFVL

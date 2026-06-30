@@ -8,7 +8,10 @@ using namespace GFVL;
 
 // USER-DEFINED STUFF
 namespace GFVL {
-Mesh::Mesh(DEVICE &device, const CreateInfo &createInfo) : device(device), size_(createInfo.size), vertexBuffer_(device, VertexBuffer::CreateInfo{.size = createInfo.size, .data = createInfo.data, .type = createInfo.type}) {
+Mesh::Mesh(DEVICE &device, const CreateInfo &createInfo) : device_(device),
+                                                           size_(createInfo.size),
+                                                           vertexBuffer_(device, VertexBuffer::CreateInfo{.size = createInfo.size, .data = createInfo.data, .type = createInfo.type}) 
+{
 }
 size_t Mesh::size() const {
   return this->size_;
