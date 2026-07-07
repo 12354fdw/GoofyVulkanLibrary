@@ -1,10 +1,10 @@
 /**
- * @file GFVL.hpp
- * @brief Defines everything about GFVL.
- * @details This is probably the file you wanna include.
+ * @file GFVL_core.hpp
+ * @brief Defines GFVL core functions.
+ * @details Don't include this. Unless you wanna do some master hacking?
  */
-#ifndef GFVL_CPP
-#define GFVL_CPP
+#ifndef GFVL_CORE_CPP
+#define GFVL_CORE_CPP
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 #include <cstdint>
@@ -14,23 +14,8 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
-#define PRINT(message) std::cout << "[GFVL] " << message << "\n";
-#define THROW_EXCEPTION(reason)                 \
-  do {                                          \
-    std::ostringstream oss;                     \
-    oss << "[GFVL] Error! Reason : " << reason; \
-    throw std::runtime_error(oss.str());        \
-  } while (0);
-#define ASSERT(statement, message)               \
-  if (statement) {                               \
-    std::ostringstream oss;                      \
-    oss << "[GFVL] Error! Reason : " << message; \
-    throw std::runtime_error(oss.str());         \
-  };
-#define GOOFYVLIB_ITERATION 1 // internal application name
-
+#include "GFVL_definition.hpp"
 namespace GFVL {
-const bool DEBUG_MODE = true;
 class PIPELINE;
 enum PREFERRED_GPU {
   PREFERRED_GPU_POWER_SAVING,
@@ -89,7 +74,7 @@ public:
 
 class Semaphore {
 public:
-  VkSemaphore semaphore;
+  VkSemaphore semaphore = VK_NULL_HANDLE;
   Semaphore(DEVICE &device) : device_(device) {
     VkSemaphoreCreateInfo semaphoreInfo{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
     vkCreateSemaphore(this->device_.logicalDevice, &semaphoreInfo, nullptr, &this->semaphore);
@@ -115,7 +100,8 @@ public:
   }
 
   ~Semaphore() {
-    vkDestroySemaphore(this->device_.logicalDevice, this->semaphore, nullptr);
+    if (this->semaphore != VK_NULL_HANDLE)
+      vkDestroySemaphore(this->device_.logicalDevice, this->semaphore, nullptr);
   }
 
 private:
@@ -124,7 +110,7 @@ private:
 
 class Fence {
 public:
-  VkFence fence;
+  VkFence fence = VK_NULL_HANDLE;
   Fence(DEVICE &device, VkFenceCreateFlags flags) : device_(device) {
     VkFenceCreateInfo fenceInfo{.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = flags};
     vkCreateFence(this->device_.logicalDevice, &fenceInfo, nullptr, &this->fence);
@@ -149,10 +135,12 @@ public:
   }
 
   ~Fence() {
-    vkDestroyFence(this->device_.logicalDevice, this->fence, nullptr);
+    if (this->fence != VK_NULL_HANDLE) 
+      vkDestroyFence(this->device_.logicalDevice, this->fence, nullptr);
   }
+
 private:
-  DEVICE& device_;
+  DEVICE &device_;
 };
 
 class SWAPCHAIN {
@@ -273,7 +261,11 @@ public:
 private:
   DEVICE &device;
 };
-
+/**
+ * @class Framebuffer
+ * @brief Stores Vulkan framebuffers.
+ * @details 
+ */ 
 class Framebuffer {
 public:
   std::vector<VkFramebuffer> framebuffers;
@@ -336,7 +328,7 @@ public:
   enum class MemoryAllocation {
     HostVisibleOpportunistic, ///< Memory will be visible to CPU, but physically it is still in VRAM. Faster for GPU's that support ReBar.
     HostVisible,              ///< Memory allocated will be visible to CPU. Use for non-static meshes.
-    DeviceOnly                ///< Memory allocated will be in VRAM. Use for static-meshes. Faster.
+    DeviceOnly                ///< Memory allocated will be in VRAM. Use for static-meshes. Fastest.
   };
 
   /**
@@ -352,7 +344,7 @@ public:
   const void *data() const;            ///< Returns the pointer to the buffer data, only for memory allocation strategy of HostVisible
   const size_t size() const;           ///< Returns the allocated buffer size in buffer.
   const VkBuffer &buffer() const;      ///< Returns a reference to the Vulkan buffer handle.
-  const MemoryAllocation type() const; ///< Returns the memory allocation strategy of the buffer.
+  const MemoryAllocation memoryAllocation() const; ///< Returns the memory allocation strategy of the buffer.
 
   /**
    * @brief Creates a vertex buffer.
@@ -420,38 +412,11 @@ private:
   VertexBuffer vertexBuffer_; ///< The buffer containing the actual memory
 };
 
-class INSTANCE {
-public:
-  VkInstance instance;
-  SDL_Window *window;
-  VkSurfaceKHR surface;
-  DEVICE device;
-  SWAPCHAIN swapchain;
-  RENDERPASS renderPass;
-  UNIFORM_BUFFER uniformBuffer;
-  std::vector<SHADER> shaderStages;
-  PIPELINE pipeline;
-  Framebuffer framebuffer;
-  CommandPool commandPool;
-
-  INSTANCE(APPLICATION_INFO applicationInfo, VERTEX_LAYOUT &layout, std::vector<UNIFORM_BUFFER_BINDING> &bindings, std::vector<SHADER_STAGE> &stages);
-  ~INSTANCE();
-
-  INSTANCE(const INSTANCE &) = delete;
-  INSTANCE &operator=(const INSTANCE &) = delete;
-
-  INSTANCE(const INSTANCE &&) = delete;
-  INSTANCE &operator=(const INSTANCE &&) = delete;
-};
-
-// defined in GFVL.cpp
 std::vector<char> readFile(const std::string &filename);
 const char *VkResultToString(VkResult result);
 void PrintVkResult(VkResult result);
 VkResult CheckVkResult(VkResult result);
 uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties);
 void createBuffer(DEVICE &device, size_t size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
-
-} // namespace GFVL
-
+}
 #endif

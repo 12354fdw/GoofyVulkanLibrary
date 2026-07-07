@@ -7,7 +7,7 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
-#include "GFVL.hpp"
+#include "../include/GFVL.hpp"
 using namespace GFVL;
 
 // USER-DEFINED STUFF
@@ -24,7 +24,7 @@ VkInstance InitializeVkInstance(APPLICATION_INFO applicationInfo) {
       .pApplicationName = applicationInfo.applicationName,
       .applicationVersion = applicationInfo.applicationVersion,
       .pEngineName = "goofyVLib",
-      .engineVersion = GOOFYVLIB_ITERATION,
+      .engineVersion = GFVL_VERSION,
       .apiVersion = VK_API_VERSION_1_3};
 
   uint32_t instanceExtensionCount = 0;

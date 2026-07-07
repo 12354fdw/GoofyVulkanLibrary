@@ -7,8 +7,8 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
-#include "GFVL.hpp"
-#include "enumPrinter.hpp"
+#include "../lib/GFVL_core.hpp"
+#include "../lib/enumPrinter.hpp"
 using namespace GFVL;
 
 // USER-DEFINED STUFF
@@ -91,7 +91,7 @@ const size_t VertexBuffer::size() const {
 const VkBuffer &VertexBuffer::buffer() const {
   return this->buffer_;
 }
-const VertexBuffer::MemoryAllocation VertexBuffer::type() const {
+const VertexBuffer::MemoryAllocation VertexBuffer::memoryAllocation() const {
   return this->type_;
 }
 VertexBuffer::VertexBuffer(VertexBuffer &&other) noexcept

@@ -2,7 +2,7 @@
 #include <SDL3/SDL_vulkan.h>
 #include <vulkan/vulkan.h>
 
-#include "GFVL.hpp"
+#include "../lib/GFVL_core.hpp"
 using namespace GFVL;
 
 // USER-DEFINED STUFF

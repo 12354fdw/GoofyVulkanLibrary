@@ -7,7 +7,7 @@
 #include <iostream>
 #include <vulkan/vulkan.h>
 
-#include "GFVL.hpp"
+#include "../lib/GFVL_core.hpp"
 using namespace GFVL;
 
 // USER-DEFINED STUFF

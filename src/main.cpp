@@ -1,4 +1,5 @@
-#include "GFVL/GFVL.hpp"
+#include "../lib/GFVL/include/GFVL.hpp"
+#include "../lib/GFVL/lib/GFVL_core.hpp"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 #include <cstddef>
@@ -264,8 +265,7 @@ int main() {
   constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
   uint32_t currentFrame = 0;
   uint32_t imageCount = GFVLinstance.swapchain.images.size(); 
-  print(imageCount)
-
+  
   std::vector<GFVL::Semaphore> imageAvailable;
   imageAvailable.reserve(MAX_FRAMES_IN_FLIGHT);
   for (uint8_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) imageAvailable.emplace_back(GFVLinstance.device);
@@ -278,9 +278,7 @@ int main() {
   inFlightFence.reserve(MAX_FRAMES_IN_FLIGHT);
   for (uint8_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) inFlightFence.emplace_back(GFVLinstance.device, VK_FENCE_CREATE_SIGNALED_BIT);
 
-  std::vector<GFVL::Fence> imagesInFlightFence;
-  imagesInFlightFence.reserve(imageCount);
-  for (uint8_t i = 0; i < imageCount; i++) imagesInFlightFence.emplace_back(GFVLinstance.device, VK_FENCE_CREATE_SIGNALED_BIT);
+  std::vector<VkFence> imagesInFlightFence(imageCount, 0);
 
   bool running = true;
   bool menu = false;
@@ -342,6 +340,8 @@ int main() {
       GFVLinstance.swapchain.recreate(GFVLinstance.window, GFVLinstance.surface);
       GFVLinstance.framebuffer.recreate(GFVLinstance.swapchain, GFVLinstance.renderPass);
       GFVLinstance.commandPool.recreate(GFVLinstance.framebuffer);
+      imageCount = GFVLinstance.swapchain.images.size();
+
 
       imageAvailable.clear();
       imageAvailable.reserve(MAX_FRAMES_IN_FLIGHT);
@@ -355,10 +355,7 @@ int main() {
       inFlightFence.reserve(MAX_FRAMES_IN_FLIGHT);
       for (uint8_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) inFlightFence.emplace_back(GFVLinstance.device, VK_FENCE_CREATE_SIGNALED_BIT);
       
-      imagesInFlightFence.clear();
-      imagesInFlightFence.reserve(imageCount);
-      for (uint8_t i = 0; i < imageCount; i++) imagesInFlightFence.emplace_back(GFVLinstance.device, VK_FENCE_CREATE_SIGNALED_BIT);
-    
+      imagesInFlightFence = std::vector<VkFence>(imageCount, 0);
       framebufferResized = false;
       int w, h;
       SDL_GetWindowSizeInPixels(GFVLinstance.window, &w, &h);
@@ -401,18 +398,16 @@ int main() {
 
     uint32_t imageIndex;
     CheckVkResult(vkAcquireNextImageKHR(GFVLinstance.device.logicalDevice, GFVLinstance.swapchain.swapchain, UINT64_MAX, imageAvailable[currentFrame].semaphore, VK_NULL_HANDLE, &imageIndex));
-
-    if (imagesInFlightFence[imageIndex].fence != VK_NULL_HANDLE) {
+    if (imagesInFlightFence[imageIndex] != VK_NULL_HANDLE) {
       vkWaitForFences(
           GFVLinstance.device.logicalDevice,
           1,
-          &imagesInFlightFence[imageIndex].fence,
+          &imagesInFlightFence[imageIndex],
           VK_TRUE,
           UINT64_MAX);
     }
 
-    imagesInFlightFence[imageIndex].fence = inFlightFence[currentFrame].fence;
-
+    imagesInFlightFence[imageIndex] = inFlightFence[currentFrame].fence;
     VkCommandBuffer commandBuffer = GFVLinstance.commandPool.commandBuffer(imageIndex);
     CheckVkResult(vkResetCommandBuffer(commandBuffer, 0));
 
@@ -428,27 +423,29 @@ int main() {
     std::vector<VkDeviceMemory> giggityBufferMemory(meshList.size());
     uint32_t giggityIndex = 0;
     for (const GFVL::Mesh &mesh : meshList) {
-      GFVL::createBuffer(
-          GFVLinstance.device,
-          mesh.size(),
-          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-          giggityBuffer[giggityIndex],
-          giggityBufferMemory[giggityIndex]);
+      if (mesh.vertexBuffer().memoryAllocation() == GFVL::VertexBuffer::MemoryAllocation::DeviceOnly) {
+        GFVL::createBuffer(
+            GFVLinstance.device,
+            mesh.size(),
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            giggityBuffer[giggityIndex],
+            giggityBufferMemory[giggityIndex]);
 
-      VkBufferCopy copyRegion{
-          .srcOffset = 0,
-          .dstOffset = 0,
-          .size = mesh.size()};
+        VkBufferCopy copyRegion{
+            .srcOffset = 0,
+            .dstOffset = 0,
+            .size = mesh.size()};
 
-      vkCmdCopyBuffer(
-          commandBuffer,
-          mesh.vertexBuffer().buffer(),
-          giggityBuffer[giggityIndex],
-          1,
-          &copyRegion);
+        vkCmdCopyBuffer(
+            commandBuffer,
+            mesh.vertexBuffer().buffer(),
+            giggityBuffer[giggityIndex],
+            1,
+            &copyRegion);
 
-      giggityIndex++;
+        giggityIndex++;
+      }
     }
 
     VkRenderPassBeginInfo renderPassInfo{

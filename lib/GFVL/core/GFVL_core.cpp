@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <vulkan/vulkan.h>
 
-#include "../GFVL.hpp"
+#include "../lib/GFVL_core.hpp"
 using namespace GFVL;
 
 namespace GFVL {
