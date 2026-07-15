@@ -16,10 +16,9 @@ You should have received a copy of the GNU Lesser General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 */
+
 #include "../lib/GFVL/include/GFVL.hpp"
 #include "../lib/GFVL/lib/GFVL_core.hpp"
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_vulkan.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -36,7 +35,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #define print(message) std::cout << message << "\n";
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
-
 // Remove-Item build -Recurse -Force; cmake -B build -DCMAKE_PREFIX_PATH=C:/msys64/ucrt64 -G Ninja
 // cmake --build build --verbose; build/main.exe
 // glslc src/vertex_shader.vert -o src/vertex_shader.spv
@@ -46,70 +44,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 // cmake -B build -DCMAKE_BUILD_TYPE=Release
 // cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 // rm -Force build/main.exe; rm -Force src/fragment_shader.spv; rm -Force src/vertex_shader.spv; glslc src/vertex_shader.vert -o src/vertex_shader.spv; glslc src/fragment_shader.frag -o src/fragment_shader.spv;  cmake --build build --verbose; build/main.exe
-
-const char *VkResultToString(VkResult result) {
-  switch (result) {
-  case VK_SUCCESS:
-    return "VK_SUCCESS";
-  case VK_NOT_READY:
-    return "VK_NOT_READY";
-  case VK_TIMEOUT:
-    return "VK_TIMEOUT";
-  case VK_EVENT_SET:
-    return "VK_EVENT_SET";
-  case VK_EVENT_RESET:
-    return "VK_EVENT_RESET";
-  case VK_INCOMPLETE:
-    return "VK_INCOMPLETE";
-
-  case VK_ERROR_OUT_OF_HOST_MEMORY:
-    return "VK_ERROR_OUT_OF_HOST_MEMORY";
-  case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-    return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
-  case VK_ERROR_INITIALIZATION_FAILED:
-    return "VK_ERROR_INITIALIZATION_FAILED";
-  case VK_ERROR_DEVICE_LOST:
-    return "VK_ERROR_DEVICE_LOST";
-  case VK_ERROR_MEMORY_MAP_FAILED:
-    return "VK_ERROR_MEMORY_MAP_FAILED";
-  case VK_ERROR_LAYER_NOT_PRESENT:
-    return "VK_ERROR_LAYER_NOT_PRESENT";
-  case VK_ERROR_EXTENSION_NOT_PRESENT:
-    return "VK_ERROR_EXTENSION_NOT_PRESENT";
-  case VK_ERROR_FEATURE_NOT_PRESENT:
-    return "VK_ERROR_FEATURE_NOT_PRESENT";
-  case VK_ERROR_INCOMPATIBLE_DRIVER:
-    return "VK_ERROR_INCOMPATIBLE_DRIVER";
-  case VK_ERROR_TOO_MANY_OBJECTS:
-    return "VK_ERROR_TOO_MANY_OBJECTS";
-  case VK_ERROR_FORMAT_NOT_SUPPORTED:
-    return "VK_ERROR_FORMAT_NOT_SUPPORTED";
-
-  default:
-    return "UNKNOWN_VK_RESULT";
-  }
-}
-VkResult CheckVkResult(VkResult result) {
-  if (result < 0) {
-    std::cout << "[GFVL] Error! : " << VkResultToString(result) << " (" << static_cast<int>(result) << ")\n";
-    throw std::runtime_error("[GFVL] Error detected. read the above message");
-  }
-  return result;
-}
-
-void setViewport(VkCommandBuffer &commandBuffer, GFVL::SWAPCHAIN &swapchain) {
-  VkViewport viewport{
-      .x = 0.0f,
-      .y = 0.0f,
-      .width = (float)swapchain.extent.width,
-      .height = (float)swapchain.extent.height,
-      .minDepth = 0.0f,
-      .maxDepth = 1.0f};
-  vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-  VkRect2D scissor{.offset = {0, 0}, .extent = swapchain.extent}; // this just cuts off rendering if not in swapchain
-  vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-}
 // USER-DEFINED STUFF
 
 struct vertice {
@@ -268,140 +202,78 @@ int main() {
     yI = 0;
     xI++;
   }
-  std::vector<GFVL::Mesh> meshList;
-
-  meshList.emplace_back(GFVL::Mesh(
+  GFVLinstance.meshesToRender.emplace_back(GFVL::Mesh(
       GFVLinstance.device,
-      GFVL::Mesh::CreateInfo{.size = vertices.size() * sizeof(vertice), .data = vertices.data(), .type = GFVL::VertexBuffer::MemoryAllocation::DeviceOnly}));
+      GFVL::Mesh::CreateInfo{.size = vertices.size() * sizeof(vertice), .data = vertices.data(), .memoryAllocation = GFVL::VertexBuffer::MemoryAllocation::DeviceOnly}));
 
   // debug
   uint32_t verticeAmount = 0;
-  for (const GFVL::Mesh &mesh : meshList) {
+  for (const GFVL::Mesh &mesh : GFVLinstance.meshesToRender) {
     verticeAmount += mesh.size() / sizeof(vertice);
   }
-  print("Vertices : " << verticeAmount) 
+  print("Vertices : " << verticeAmount)
 
-  constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
-  uint32_t currentFrame = 0;
-  uint32_t imageCount = GFVLinstance.swapchain.images.size(); 
-  
-  std::vector<GFVL::Semaphore> imageAvailable;
-  imageAvailable.reserve(MAX_FRAMES_IN_FLIGHT);
-  for (uint8_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) imageAvailable.emplace_back(GFVLinstance.device);
-
-  std::vector<GFVL::Semaphore> renderFinished;
-  renderFinished.reserve(imageCount);
-  for (uint8_t i = 0; i < imageCount; i++) renderFinished.emplace_back(GFVLinstance.device);
-
-  std::vector<GFVL::Fence> inFlightFence;
-  inFlightFence.reserve(MAX_FRAMES_IN_FLIGHT);
-  for (uint8_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) inFlightFence.emplace_back(GFVLinstance.device, VK_FENCE_CREATE_SIGNALED_BIT);
-
-  std::vector<VkFence> imagesInFlightFence(imageCount, 0);
-
-  bool running = true;
   bool menu = false;
-  bool framebufferResized = false;
   float speed = 1.0f;
-
-  float aspect = 0;
-  int w, h;
-  SDL_GetWindowSizeInPixels(GFVLinstance.window, &w, &h);
-  aspect = static_cast<float>(w) / static_cast<float>(h);
 
   uint64_t last_time = SDL_GetPerformanceCounter();
   float delta_time = 0.0; // In seconds
 
-  glm::vec3 position(0, 0, 0);
+  glm::vec3 position(0, 0, -25);
   glm::quat angle;
-  while (running) {
+  while (GFVLinstance.running) {
     uint64_t current_time = SDL_GetPerformanceCounter();
     delta_time = (double)(current_time - last_time) / (double)SDL_GetPerformanceFrequency();
     last_time = current_time;
+  
+    GFVLinstance.pollInputs();
+    GFVLinstance.uniformBuffer.bindings[0].update(&camera);
+    //GFVLinstance.uniformBuffer.bind(GFVLinstance.commandBuffer, GFVLinstance.pipeline, 0);
+    if (GFVLinstance.inputState.isMouseMoved()) {
+      GFVL::MouseState mouseState = GFVLinstance.inputState.getMouseState();
 
-    SDL_Event event;
+      static float yaw = 0.0f;
+      static float pitch = 0.0f;
 
-    while (SDL_PollEvent(&event)) {
-      if (event.type == SDL_EVENT_QUIT)
-        running = false;
+      float sens = 0.002f;
 
-      if (event.type == SDL_EVENT_WINDOW_RESIZED ||
-          event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
-        framebufferResized = true;
-      if (event.type == SDL_EVENT_MOUSE_MOTION) {
-        static float yaw = 0.0f;
-        static float pitch = 0.0f;
+      yaw -= mouseState.xDelta * sens;
+      pitch += mouseState.yDelta * sens;
 
-        float sens = 0.002f;
+      pitch = glm::clamp(pitch, -1.5f, 1.5f);
 
-        yaw -= event.motion.xrel * sens;
-        pitch += event.motion.yrel * sens;
+      glm::quat qYaw = glm::angleAxis(yaw, glm::vec3(0, 1, 0));
+      glm::quat qPitch = glm::angleAxis(pitch, glm::vec3(1, 0, 0));
 
-        pitch = glm::clamp(pitch, -1.5f, 1.5f);
-
-        glm::quat qYaw = glm::angleAxis(yaw, glm::vec3(0, 1, 0));
-        glm::quat qPitch = glm::angleAxis(pitch, glm::vec3(1, 0, 0));
-
-        angle = glm::normalize(qYaw * qPitch);
-      }
-      if (event.type == SDL_EVENT_KEY_DOWN) {
-        if (event.key.repeat == 0) {
-          if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
-            menu = !menu;
-            SDL_SetWindowRelativeMouseMode(GFVLinstance.window, menu);
-          }
-        }
-      }
+      angle = glm::normalize(qYaw * qPitch);
     }
 
-    if (framebufferResized) {
-      vkDeviceWaitIdle(GFVLinstance.device.logicalDevice);
-      GFVLinstance.swapchain.recreate(GFVLinstance.window, GFVLinstance.surface);
-      GFVLinstance.framebuffer.recreate(GFVLinstance.swapchain, GFVLinstance.renderPass);
-      GFVLinstance.commandPool.recreate(GFVLinstance.framebuffer);
-      imageCount = GFVLinstance.swapchain.images.size();
 
-
-      imageAvailable.clear();
-      imageAvailable.reserve(MAX_FRAMES_IN_FLIGHT);
-      for (uint8_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) imageAvailable.emplace_back(GFVLinstance.device);
-
-      renderFinished.clear();
-      renderFinished.reserve(imageCount);
-      for (uint8_t i = 0; i < imageCount; i++) renderFinished.emplace_back(GFVLinstance.device);
-    
-      inFlightFence.clear();
-      inFlightFence.reserve(MAX_FRAMES_IN_FLIGHT);
-      for (uint8_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) inFlightFence.emplace_back(GFVLinstance.device, VK_FENCE_CREATE_SIGNALED_BIT);
-      
-      imagesInFlightFence = std::vector<VkFence>(imageCount, 0);
-      framebufferResized = false;
-      int w, h;
-      SDL_GetWindowSizeInPixels(GFVLinstance.window, &w, &h);
-      aspect = static_cast<float>(w) / static_cast<float>(h);
+    if (GFVLinstance.inputState.isKeyPressed(GFVL::Keycode::ESCAPE) && !GFVLinstance.inputState.isKeyRepeated(GFVL::Keycode::ESCAPE)) {
+      menu = !menu;
+      SDL_SetWindowRelativeMouseMode(GFVLinstance.window, menu);
     }
 
-    const bool *keyboard = SDL_GetKeyboardState(nullptr);
-    float speed = keyboard[SDL_SCANCODE_LSHIFT] ? 250.0f : 5.0f;
+    float speed = GFVLinstance.inputState.isKeyPressed(GFVL::Keycode::LSHIFT) ? 250.0f : 5.0f;
     glm::vec3 forward = angle * glm::vec3(0, 0, -1);
     glm::vec3 right = angle * glm::vec3(1, 0, 0);
 
-    if (keyboard[SDL_SCANCODE_W])
+    if (GFVLinstance.inputState.isKeyPressed(GFVL::Keycode::W))
       position += forward * speed * delta_time;
-    if (keyboard[SDL_SCANCODE_SPACE]) {
+    if (GFVLinstance.inputState.isKeyPressed(GFVL::Keycode::SPACE)) {
       lighting.lightPos = position;
       GFVLinstance.uniformBuffer.bindings[1].update(&lighting);
     }
-    if (keyboard[SDL_SCANCODE_S])
+    if (GFVLinstance.inputState.isKeyPressed(GFVL::Keycode::S))
       position -= forward * speed * delta_time;
-    if (keyboard[SDL_SCANCODE_A])
+    if (GFVLinstance.inputState.isKeyPressed(GFVL::Keycode::A))
       position -= right * speed * delta_time;
-    if (keyboard[SDL_SCANCODE_D])
+    if (GFVLinstance.inputState.isKeyPressed(GFVL::Keycode::D))
       position += right * speed * delta_time;
 
     glm::mat4 proj = glm::perspectiveRH_ZO(
         glm::radians(90.0f),
-        aspect,
+        GFVLinstance.aspectRatio,
         0.01f,
         100000.0f);
 
@@ -412,132 +284,10 @@ int main() {
     camera.MVP = proj * view;
     camera.viewPos = position;
 
-    vkWaitForFences(GFVLinstance.device.logicalDevice, 1, &inFlightFence[currentFrame].fence, VK_TRUE, UINT64_MAX);
-    vkResetFences(GFVLinstance.device.logicalDevice, 1, &inFlightFence[currentFrame].fence);
-
-    uint32_t imageIndex;
-    CheckVkResult(vkAcquireNextImageKHR(GFVLinstance.device.logicalDevice, GFVLinstance.swapchain.swapchain, UINT64_MAX, imageAvailable[currentFrame].semaphore, VK_NULL_HANDLE, &imageIndex));
-    if (imagesInFlightFence[imageIndex] != VK_NULL_HANDLE) {
-      vkWaitForFences(
-          GFVLinstance.device.logicalDevice,
-          1,
-          &imagesInFlightFence[imageIndex],
-          VK_TRUE,
-          UINT64_MAX);
-    }
-
-    imagesInFlightFence[imageIndex] = inFlightFence[currentFrame].fence;
-    VkCommandBuffer commandBuffer = GFVLinstance.commandPool.commandBuffer(imageIndex);
-    CheckVkResult(vkResetCommandBuffer(commandBuffer, 0));
-
-    VkCommandBufferBeginInfo beginInfo{.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-    CheckVkResult(vkBeginCommandBuffer(commandBuffer, &beginInfo));
-
-    VkClearValue clearColor{.color = {0.05f, 0.05f, 0.05f, 1.0f}};
-    VkClearValue clearValues[2]{};
-    clearValues[0].color = {{0.05f, 0.05f, 0.05f, 1.0f}};
-    clearValues[1].depthStencil = {1.0f, 0};
-
-    std::vector<VkBuffer> giggityBuffer(meshList.size());
-    std::vector<VkDeviceMemory> giggityBufferMemory(meshList.size());
-    uint32_t giggityIndex = 0;
-    for (const GFVL::Mesh &mesh : meshList) {
-      if (mesh.vertexBuffer().memoryAllocation() == GFVL::VertexBuffer::MemoryAllocation::DeviceOnly) {
-        GFVL::createBuffer(
-            GFVLinstance.device,
-            mesh.size(),
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            giggityBuffer[giggityIndex],
-            giggityBufferMemory[giggityIndex]);
-
-        VkBufferCopy copyRegion{
-            .srcOffset = 0,
-            .dstOffset = 0,
-            .size = mesh.size()};
-
-        vkCmdCopyBuffer(
-            commandBuffer,
-            mesh.vertexBuffer().buffer(),
-            giggityBuffer[giggityIndex],
-            1,
-            &copyRegion);
-
-        giggityIndex++;
-      }
-    }
-
-    VkRenderPassBeginInfo renderPassInfo{
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = GFVLinstance.renderPass.renderPass,
-        .framebuffer = GFVLinstance.framebuffer.framebuffers[imageIndex],
-        .renderArea = {
-            .offset = {0, 0},
-            .extent = GFVLinstance.swapchain.extent},
-        .clearValueCount = 2,
-        .pClearValues = clearValues};
-
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GFVLinstance.pipeline.pipeline);
-
-    GFVLinstance.uniformBuffer.bindings[0].update(&camera);
-    GFVLinstance.uniformBuffer.bind(commandBuffer, GFVLinstance.pipeline, 0);
-    setViewport(commandBuffer, GFVLinstance.swapchain);
-    VkDeviceSize offsets[] = {0};
-
-    vkCmdBindVertexBuffers(commandBuffer, 0, giggityBuffer.size(), giggityBuffer.data(), offsets);
-
-    vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
-
-    vkCmdEndRenderPass(commandBuffer);
-
-    CheckVkResult(vkEndCommandBuffer(commandBuffer));
-
-    VkSemaphore waitSemaphores[] = {imageAvailable[currentFrame].semaphore};
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    VkSemaphore signalSemaphores[] = {renderFinished[imageIndex].semaphore};
-
-    VkSubmitInfo submitInfo{
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = waitSemaphores,
-        .pWaitDstStageMask = waitStages,
-        .commandBufferCount = 1,
-        .pCommandBuffers = &commandBuffer,
-        .signalSemaphoreCount = 1,
-        .pSignalSemaphores = signalSemaphores};
-
-    CheckVkResult(vkQueueSubmit(GFVLinstance.device.graphicsQueue, 1, &submitInfo, inFlightFence[currentFrame].fence));
-
-    VkSwapchainKHR swapchains[] = {GFVLinstance.swapchain.swapchain};
-
-    VkPresentInfoKHR presentInfo{
-        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = signalSemaphores,
-        .swapchainCount = 1,
-        .pSwapchains = swapchains,
-        .pImageIndices = &imageIndex};
-
-    CheckVkResult(vkQueuePresentKHR(GFVLinstance.device.graphicsQueue, &presentInfo));
-
-    vkWaitForFences(
-        GFVLinstance.device.logicalDevice,
-        1,
-        &inFlightFence[currentFrame].fence,
-        VK_TRUE,
-        UINT64_MAX);
-    for (uint32_t i = 0; i < giggityBuffer.size(); i++) {
-      vkDestroyBuffer(GFVLinstance.device.logicalDevice, giggityBuffer[i], nullptr);
-      vkFreeMemory(GFVLinstance.device.logicalDevice, giggityBufferMemory[i], nullptr);
-    }
-
-    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+    GFVLinstance.frame();
   }
 
   vkDeviceWaitIdle(GFVLinstance.device.logicalDevice);
-
 
   return 0;
 }

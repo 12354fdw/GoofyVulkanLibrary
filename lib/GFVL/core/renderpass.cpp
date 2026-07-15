@@ -25,7 +25,7 @@ using namespace GFVL;
 
 // USER-DEFINED STUFF
 namespace GFVL {
-RENDERPASS::RENDERPASS(DEVICE &device, SWAPCHAIN &swapchain) : device(device)  {
+RENDERPASS::RENDERPASS(DEVICE &device, Swapchain &swapchain) : device(device) {
 
   VkAttachmentDescription depthAttachment{
       .format = VK_FORMAT_D32_SFLOAT,

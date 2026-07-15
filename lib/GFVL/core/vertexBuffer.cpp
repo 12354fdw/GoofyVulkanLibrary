@@ -31,8 +31,8 @@ using namespace GFVL;
 
 // USER-DEFINED STUFF
 namespace GFVL {
-VertexBuffer::VertexBuffer(DEVICE &device, const VertexBuffer::CreateInfo &createInfo) : device_(device), size_(createInfo.size), type_(createInfo.type) {
-  if (createInfo.type == VertexBuffer::MemoryAllocation::HostVisibleOpportunistic) {
+VertexBuffer::VertexBuffer(DEVICE &device, const VertexBuffer::CreateInfo &createInfo) : device_(device), size_(createInfo.size), memoryAllocation_(createInfo.memoryAllocation) {
+  if (createInfo.memoryAllocation == VertexBuffer::MemoryAllocation::HostVisibleOpportunistic) {
     createBuffer(
         device,
         createInfo.size,
@@ -52,7 +52,7 @@ VertexBuffer::VertexBuffer(DEVICE &device, const VertexBuffer::CreateInfo &creat
     memcpy(this->data_, createInfo.data, createInfo.size);
 
     vkUnmapMemory(device.logicalDevice, bufferMemory_);
-  } else if (createInfo.type == VertexBuffer::MemoryAllocation::HostVisible) {
+  } else if (createInfo.memoryAllocation == VertexBuffer::MemoryAllocation::HostVisible) {
     createBuffer(
         device,
         createInfo.size,
@@ -73,7 +73,7 @@ VertexBuffer::VertexBuffer(DEVICE &device, const VertexBuffer::CreateInfo &creat
 
     vkUnmapMemory(device.logicalDevice, bufferMemory_);
 
-  } else if (createInfo.type == VertexBuffer::MemoryAllocation::DeviceOnly) {
+  } else if (createInfo.memoryAllocation == VertexBuffer::MemoryAllocation::DeviceOnly) {
     createBuffer(
         device,
         createInfo.size,
@@ -99,26 +99,13 @@ VertexBuffer::VertexBuffer(DEVICE &device, const VertexBuffer::CreateInfo &creat
     THROW_EXCEPTION("Invalid VERTEX_BUFFER_TYPE!");
   }
 }
-const void *VertexBuffer::data() const {
-  ASSERT(this->type_ != VertexBuffer::MemoryAllocation::HostVisible, "Attempted to access vertex buffer without parameter HOST_VISIBLE, current enum is " << enumToString(this->type_));
-  return this->data_;
-}
-const size_t VertexBuffer::size() const {
-  return this->size_;
-}
-const VkBuffer &VertexBuffer::buffer() const {
-  return this->buffer_;
-}
-const VertexBuffer::MemoryAllocation VertexBuffer::memoryAllocation() const {
-  return this->type_;
-}
 VertexBuffer::VertexBuffer(VertexBuffer &&other) noexcept
     : device_(other.device_),
       buffer_(other.buffer_),
       bufferMemory_(other.bufferMemory_),
       data_(other.data_),
       size_(other.size_),
-      type_(other.type_) {
+      memoryAllocation_(other.memoryAllocation_) {
   other.buffer_ = VK_NULL_HANDLE;
   other.bufferMemory_ = VK_NULL_HANDLE;
   other.data_ = nullptr;
@@ -141,7 +128,7 @@ VertexBuffer &VertexBuffer::operator=(VertexBuffer &&other) {
   this->bufferMemory_ = other.bufferMemory_;
   this->data_ = other.data_;
   this->size_ = other.size_;
-  this->type_ = other.type_;
+  this->memoryAllocation_ = other.memoryAllocation_;
 
   other.buffer_ = VK_NULL_HANDLE;
   other.bufferMemory_ = VK_NULL_HANDLE;

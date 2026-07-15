@@ -41,11 +41,12 @@ enum PREFERRED_GPU {
 };
 
 struct APPLICATION_INFO {
-  const char *applicationName;
-  uint32_t applicationVersion;
-  int width;
-  int height;
-  PREFERRED_GPU preferredGPU;
+  const char *applicationName = "No application name!";
+  uint32_t applicationVersion = 1;
+  int width = 800;
+  int height = 600;
+  uint32_t maxFramesInFlight = 2;
+  PREFERRED_GPU preferredGPU = PREFERRED_GPU_PERFORMANCE;
 };
 
 struct UNIFORM_BUFFER_BINDING {
@@ -153,7 +154,7 @@ public:
   }
 
   ~Fence() {
-    if (this->fence != VK_NULL_HANDLE) 
+    if (this->fence != VK_NULL_HANDLE)
       vkDestroyFence(this->device_.logicalDevice, this->fence, nullptr);
   }
 
@@ -161,7 +162,7 @@ private:
   DEVICE &device_;
 };
 
-class SWAPCHAIN {
+class Swapchain {
 public:
   VkSwapchainKHR swapchain{};
 
@@ -176,17 +177,18 @@ public:
   bool framebufferResized = false;
 
   void recreate(SDL_Window *window, VkSurfaceKHR surface);
-  SWAPCHAIN(DEVICE &device, SDL_Window *window, VkSurfaceKHR surface);
-  ~SWAPCHAIN();
 
-  SWAPCHAIN(const SWAPCHAIN &) = delete;
-  SWAPCHAIN &operator=(const SWAPCHAIN &) = delete;
+  Swapchain(DEVICE &device, SDL_Window *window, VkSurfaceKHR surface);
+  ~Swapchain();
 
-  SWAPCHAIN(const SWAPCHAIN &&) = delete;
-  SWAPCHAIN &operator=(const SWAPCHAIN &&) = delete;
+  Swapchain(const Swapchain &) = delete;
+  Swapchain &operator=(const Swapchain &) = delete;
+
+  Swapchain(const Swapchain &&) = delete;
+  Swapchain &operator=(const Swapchain &&) = delete;
 
 private:
-  DEVICE &device;
+  DEVICE &device_;
 };
 
 class SHADER {
@@ -211,7 +213,7 @@ class RENDERPASS {
 public:
   VkRenderPass renderPass = {};
 
-  RENDERPASS(DEVICE &device, SWAPCHAIN &swapchain);
+  RENDERPASS(DEVICE &device, Swapchain &swapchain);
   ~RENDERPASS();
 
   RENDERPASS(const RENDERPASS &) = delete;
@@ -267,7 +269,7 @@ public:
   VkPipelineLayout pipelineLayout;
   VkPipeline pipeline = {};
 
-  PIPELINE(DEVICE &device, SWAPCHAIN &swapchain, VERTEX_LAYOUT &layout, std::vector<SHADER> &shaderStages, RENDERPASS &renderPass, std::vector<VkDescriptorSetLayout> layouts);
+  PIPELINE(DEVICE &device, Swapchain &swapchain, VERTEX_LAYOUT &layout, std::vector<SHADER> &shaderStages, RENDERPASS &renderPass, std::vector<VkDescriptorSetLayout> layouts);
   ~PIPELINE();
 
   PIPELINE(const PIPELINE &) = delete;
@@ -282,14 +284,14 @@ private:
 /**
  * @class Framebuffer
  * @brief Stores Vulkan framebuffers.
- * @details 
- */ 
+ * @details
+ */
 class Framebuffer {
 public:
   std::vector<VkFramebuffer> framebuffers;
 
-  void recreate(SWAPCHAIN &swapchain, RENDERPASS &renderPass);
-  Framebuffer(DEVICE &device, SWAPCHAIN &swapchain, RENDERPASS &renderPass);
+  void recreate(Swapchain &swapchain, RENDERPASS &renderPass);
+  Framebuffer(DEVICE &device, Swapchain &swapchain, RENDERPASS &renderPass);
   ~Framebuffer();
 
   Framebuffer(const Framebuffer &) = delete;
@@ -344,9 +346,9 @@ public:
    * @brief Defines memory allocation strategy.
    */
   enum class MemoryAllocation {
-    HostVisibleOpportunistic, ///< Memory will be visible to CPU, but physically it is still in VRAM. Faster for GPU's that support ReBar.
+    DeviceOnly,               ///< Memory allocated will be in VRAM. Use for static-meshes. Fastest.
+    HostVisibleOpportunistic, ///< Memory has both device local flag and CPU-visible flag, usually in integrated graphics or for GPUs that support ReBar, which is very fast since it is physically in VRAM.
     HostVisible,              ///< Memory allocated will be visible to CPU. Use for non-static meshes.
-    DeviceOnly                ///< Memory allocated will be in VRAM. Use for static-meshes. Fastest.
   };
 
   /**
@@ -356,13 +358,8 @@ public:
   struct CreateInfo {
     size_t size;                                           ///< Size of the allocated buffer memory in bytes.
     void *data;                                            ///< Pointer to the data to copy into the buffer.
-    MemoryAllocation type = MemoryAllocation::HostVisible; ///< Type of data, see definition.
+    MemoryAllocation memoryAllocation = MemoryAllocation::HostVisible; ///< Type of data, see definition.
   };
-
-  const void *data() const;            ///< Returns the pointer to the buffer data, only for memory allocation strategy of HostVisible
-  const size_t size() const;           ///< Returns the allocated buffer size in buffer.
-  const VkBuffer &buffer() const;      ///< Returns a reference to the Vulkan buffer handle.
-  const MemoryAllocation memoryAllocation() const; ///< Returns the memory allocation strategy of the buffer.
 
   /**
    * @brief Creates a vertex buffer.
@@ -379,55 +376,16 @@ public:
   VertexBuffer(VertexBuffer &&other) noexcept;   ///< Move constructor, allowed but it will unbind vulkan resources of old object.
   VertexBuffer &operator=(VertexBuffer &&other); ///< Move assignment operator, allowed but it will unbind vulkan resources of old object.
 
+  friend class Mesh;
+  friend class INSTANCE;
 private:
-  DEVICE &device_;              ///< Stores the device reference.
-  VkBuffer buffer_;             ///< The Vulkan Buffer handle.
-  VkDeviceMemory bufferMemory_; ///< The Vulkan memory handle.
+  DEVICE &device_;
+  VkBuffer buffer_;
+  VkDeviceMemory bufferMemory_;
 
   void *data_;            ///< A pointer to the buffer data. Used for HostVisible memory.
-  size_t size_;           ///< Size of the memory. Used mainly for debugging.
-  MemoryAllocation type_; ///< Type of the memory, not used functionalyl but used for type safety.
-};
-
-/**
- * @class Mesh
- * @brief An object containing vertice data.
- * @details Stores vertex data.
- */
-class Mesh {
-public:
-  /**
-   * @struct CreateInfo
-   * @brief Configuration for creating Mesh class.
-   */
-  struct CreateInfo {
-    size_t size;                                                                       ///< Size of the mesh in bytes.
-    void *data;                                                                        ///< Pointer to mesh data.
-    VertexBuffer::MemoryAllocation type = VertexBuffer::MemoryAllocation::HostVisible; ///< The memory allocation of this mesh. See documentation for details.
-  };
-
-  const size_t size() const;
-  const VertexBuffer &vertexBuffer() const;
-
-  /**
-   * @brief Creates a mesh buffer.
-   * @param device A reference to your Device.
-   * @param createinfo The creation information of the vertex buffer.
-   */
-  Mesh(DEVICE &device, const CreateInfo &createInfo); ///< Creates a mesh.
-
-  Mesh(const Mesh &other) = delete;            ///< Copy constructor, removed as multiple vertex buffers will have the same buffer handles.
-  Mesh &operator=(const Mesh &other) = delete; ///< Copy assignment operator, removed as multiple vertex buffers will have the same buffer handles.
-
-  Mesh(Mesh &&other) = default;  ///< Move constructor, allowed but it will unbind vulkan resources of old object.
-  Mesh &operator=(Mesh &&other); ///< Move assignment operator, allowed but it will unbind vulkan resources of old object.
-
-  ~Mesh(); ///< Destroys mesh and associated info
-
-private:
-  DEVICE &device_;            ///< Stores the device reference.
-  size_t size_;               ///< Size of the mesh in bytes.
-  VertexBuffer vertexBuffer_; ///< The buffer containing the actual memory
+  size_t size_;
+  MemoryAllocation memoryAllocation_;
 };
 
 std::vector<char> readFile(const std::string &filename);
@@ -436,5 +394,5 @@ void PrintVkResult(VkResult result);
 VkResult CheckVkResult(VkResult result);
 uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties);
 void createBuffer(DEVICE &device, size_t size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
-}
+} // namespace GFVL
 #endif

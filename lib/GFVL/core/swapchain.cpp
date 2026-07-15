@@ -31,12 +31,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 using namespace GFVL;
 
 namespace GFVL {
-void pickFormat(DEVICE &device, VkSurfaceKHR surface, VkFormat& format, VkColorSpaceKHR& colorSpace) {
+void pickFormat(DEVICE &device_, VkSurfaceKHR surface, VkFormat& format, VkColorSpaceKHR& colorSpace) {
   std::vector<VkSurfaceFormatKHR> formats;
   uint32_t count = 0;
-  CheckVkResult(vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice, surface, &count, nullptr));
+  CheckVkResult(vkGetPhysicalDeviceSurfaceFormatsKHR(device_.physicalDevice, surface, &count, nullptr));
   formats.resize(count);
-  CheckVkResult(vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice, surface, &count, formats.data()));
+  CheckVkResult(vkGetPhysicalDeviceSurfaceFormatsKHR(device_.physicalDevice, surface, &count, formats.data()));
   if (formats.empty())
     THROW_EXCEPTION("No VKFormats found.. What??")
 
@@ -55,13 +55,13 @@ void pickFormat(DEVICE &device, VkSurfaceKHR surface, VkFormat& format, VkColorS
     }
   }
 }
-VkPresentModeKHR pickPresentMode(DEVICE &device, VkSurfaceKHR surface) {
+VkPresentModeKHR pickPresentMode(DEVICE &device_, VkSurfaceKHR surface) {
   uint32_t count = 0;
 
   std::vector<VkPresentModeKHR> presentModes;
-  vkGetPhysicalDeviceSurfacePresentModesKHR(device.physicalDevice, surface, &count, nullptr);
+  vkGetPhysicalDeviceSurfacePresentModesKHR(device_.physicalDevice, surface, &count, nullptr);
   presentModes.resize(count);
-  vkGetPhysicalDeviceSurfacePresentModesKHR(device.physicalDevice, surface, &count, presentModes.data());
+  vkGetPhysicalDeviceSurfacePresentModesKHR(device_.physicalDevice, surface, &count, presentModes.data());
   if (presentModes.empty())
     THROW_EXCEPTION("No VkPresentModeKHR's found.. What??")
 
@@ -74,16 +74,16 @@ VkPresentModeKHR pickPresentMode(DEVICE &device, VkSurfaceKHR surface) {
   }
   return presentMode;
 }
-SWAPCHAIN::SWAPCHAIN(DEVICE& device, SDL_Window *window, VkSurfaceKHR surface) : device(device), presentMode(pickPresentMode(device, surface)) {
+Swapchain::Swapchain(DEVICE& device_, SDL_Window *window, VkSurfaceKHR surface) : device_(device_), presentMode(pickPresentMode(device_, surface)) {
     // giggity
     PRINT("Attempting to create swapchain")
 
     VkFormat format;
     VkColorSpaceKHR colorSpace;
-    pickFormat(this->device, surface, format, colorSpace);
+    pickFormat(this->device_, surface, format, colorSpace);
 
     VkSurfaceCapabilitiesKHR capabilities{};
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device.physicalDevice, surface, &capabilities);
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device_.physicalDevice, surface, &capabilities);
 
     VkExtent2D extent;
     if (capabilities.currentExtent.width != UINT32_MAX) {
@@ -116,15 +116,15 @@ SWAPCHAIN::SWAPCHAIN(DEVICE& device, SDL_Window *window, VkSurfaceKHR surface) :
         .clipped = VK_TRUE,
         .oldSwapchain = VK_NULL_HANDLE};
 
-    if (device.graphicsFamilyIndex != device.presentFamilyIndex) {
+    if (device_.graphicsFamilyIndex != device_.presentFamilyIndex) {
         info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
     }
     uint32_t count = 0;
-    CheckVkResult(vkCreateSwapchainKHR(this->device.logicalDevice, &info, nullptr, &this->swapchain));
-    vkGetSwapchainImagesKHR(this->device.logicalDevice, this->swapchain, &count, nullptr);
+    CheckVkResult(vkCreateSwapchainKHR(this->device_.logicalDevice, &info, nullptr, &this->swapchain));
+    vkGetSwapchainImagesKHR(this->device_.logicalDevice, this->swapchain, &count, nullptr);
 
     this->images.resize(count);
-    vkGetSwapchainImagesKHR(this->device.logicalDevice, this->swapchain, &count, this->images.data());
+    vkGetSwapchainImagesKHR(this->device_.logicalDevice, this->swapchain, &count, this->images.data());
 
     this->imageViews.resize(count);
 
@@ -143,7 +143,7 @@ SWAPCHAIN::SWAPCHAIN(DEVICE& device, SDL_Window *window, VkSurfaceKHR surface) :
               .levelCount = 1,
               .layerCount = 1}};
 
-      CheckVkResult(vkCreateImageView(this->device.logicalDevice, &vi, nullptr, &this->imageViews[i]));
+      CheckVkResult(vkCreateImageView(this->device_.logicalDevice, &vi, nullptr, &this->imageViews[i]));
     }
 
     this->format = format;
@@ -152,20 +152,20 @@ SWAPCHAIN::SWAPCHAIN(DEVICE& device, SDL_Window *window, VkSurfaceKHR surface) :
     this->imageCount = count;
     PRINT("created swapchain")
 }
-void SWAPCHAIN::recreate(SDL_Window *window, VkSurfaceKHR surface) {
-  vkDeviceWaitIdle(device.logicalDevice);
+void Swapchain::recreate(SDL_Window *window, VkSurfaceKHR surface) {
+  vkDeviceWaitIdle(device_.logicalDevice);
 
   for (auto view : imageViews)
-    vkDestroyImageView(device.logicalDevice, view, nullptr);
+    vkDestroyImageView(device_.logicalDevice, view, nullptr);
 
   imageViews.clear();
   images.clear();
 
   if (swapchain != VK_NULL_HANDLE)
-    vkDestroySwapchainKHR(device.logicalDevice, swapchain, nullptr);
+    vkDestroySwapchainKHR(device_.logicalDevice, swapchain, nullptr);
 
   VkSurfaceCapabilitiesKHR capabilities{};
-  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device.physicalDevice, surface, &capabilities);
+  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device_.physicalDevice, surface, &capabilities);
 
   int width = 0;
   int height = 0;
@@ -180,9 +180,9 @@ void SWAPCHAIN::recreate(SDL_Window *window, VkSurfaceKHR surface) {
   std::vector<VkSurfaceFormatKHR> formats;
   uint32_t count = 0;
 
-  vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice, surface, &count, nullptr);
+  vkGetPhysicalDeviceSurfaceFormatsKHR(device_.physicalDevice, surface, &count, nullptr);
   formats.resize(count);
-  vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice, surface, &count, formats.data());
+  vkGetPhysicalDeviceSurfaceFormatsKHR(device_.physicalDevice, surface, &count, formats.data());
 
   VkFormat format = formats[0].format;
   VkColorSpaceKHR colorSpace = formats[0].colorSpace;
@@ -224,16 +224,16 @@ void SWAPCHAIN::recreate(SDL_Window *window, VkSurfaceKHR surface) {
       .clipped = VK_TRUE,
       .oldSwapchain = VK_NULL_HANDLE};
 
-  if (device.graphicsFamilyIndex != device.presentFamilyIndex)
+  if (device_.graphicsFamilyIndex != device_.presentFamilyIndex)
     info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
 
-  CheckVkResult(vkCreateSwapchainKHR(device.logicalDevice, &info, nullptr, &swapchain));
+  CheckVkResult(vkCreateSwapchainKHR(device_.logicalDevice, &info, nullptr, &swapchain));
 
-  vkGetSwapchainImagesKHR(device.logicalDevice, swapchain, &count, nullptr);
+  vkGetSwapchainImagesKHR(device_.logicalDevice, swapchain, &count, nullptr);
 
   images.resize(count);
 
-  vkGetSwapchainImagesKHR(device.logicalDevice, swapchain, &count, images.data());
+  vkGetSwapchainImagesKHR(device_.logicalDevice, swapchain, &count, images.data());
 
   imageViews.resize(count);
 
@@ -250,23 +250,23 @@ void SWAPCHAIN::recreate(SDL_Window *window, VkSurfaceKHR surface) {
             VK_COMPONENT_SWIZZLE_IDENTITY},
         .subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1}};
 
-    CheckVkResult(vkCreateImageView(device.logicalDevice, &vi, nullptr, &imageViews[i]));
+    CheckVkResult(vkCreateImageView(device_.logicalDevice, &vi, nullptr, &imageViews[i]));
   }
 
   this->format = format;
   this->extent = extent;
   this->imageCount = count;
 }
-SWAPCHAIN::~SWAPCHAIN() {
-  if (device.logicalDevice == VK_NULL_HANDLE)
+Swapchain::~Swapchain() {
+  if (device_.logicalDevice == VK_NULL_HANDLE)
     return;
 
-  vkDeviceWaitIdle(device.logicalDevice);
+  vkDeviceWaitIdle(device_.logicalDevice);
 
   for (auto view : imageViews)
-    vkDestroyImageView(device.logicalDevice, view, nullptr);
+    vkDestroyImageView(device_.logicalDevice, view, nullptr);
 
   if (swapchain != VK_NULL_HANDLE)
-    vkDestroySwapchainKHR(device.logicalDevice, swapchain, nullptr);
+    vkDestroySwapchainKHR(device_.logicalDevice, swapchain, nullptr);
 }
 }

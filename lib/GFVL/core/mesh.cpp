@@ -21,21 +21,19 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <cstring>
 #include <vulkan/vulkan.h>
 
-#include "../lib/GFVL_core.hpp"
+#include "../include/GFVL.hpp"
 using namespace GFVL;
 
 // USER-DEFINED STUFF
 namespace GFVL {
 Mesh::Mesh(DEVICE &device, const CreateInfo &createInfo) : device_(device),
-                                                           size_(createInfo.size),
-                                                           vertexBuffer_(device, VertexBuffer::CreateInfo{.size = createInfo.size, .data = createInfo.data, .type = createInfo.type}) 
-{
+                                                           vertexBuffer_(device, VertexBuffer::CreateInfo{.size = createInfo.size, .data = createInfo.data, .memoryAllocation = createInfo.memoryAllocation}) {
 }
-const size_t Mesh::size() const {
-  return this->size_;
+size_t Mesh::size() const noexcept {
+  return this->vertexBuffer_.size_;
 }
-const VertexBuffer &Mesh::vertexBuffer() const {
-  return this->vertexBuffer_;
+VertexBuffer::MemoryAllocation Mesh::memoryAllocation() const noexcept {
+  return this->vertexBuffer_.memoryAllocation_;
 }
 Mesh::~Mesh() {
 }
